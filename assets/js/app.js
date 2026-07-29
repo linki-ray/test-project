@@ -93,8 +93,13 @@
     body.appendChild(opt1); body.appendChild(opt2);
 
     var st = S.stats();
-    body.appendChild(U.el('div', { class: 'muted', style: 'margin-top:8px', text: '当前模式：' + (mode === 'daily' ? '每日重置' : '永久累计') + ' · 本地占用约 ' + st.kb + ' KB（仅存于本机）' }));
-    body.appendChild(U.el('div', { class: 'muted', text: '所有数据仅保存在本地浏览器，不上传任何服务器。' }));
+    body.appendChild(U.el('div', { class: 'muted', style: 'margin-top:8px', text: '当前模式：' + (mode === 'daily' ? '每日重置' : '永久累计') + ' · 本地占用约 ' + st.kb + ' KB' }));
+    if (App.Sync && App.Sync.ENABLED) {
+      var syncTxt = App.Sync.isLoggedIn() ? '已开启云端同步：手机与电脑共用同一份数据' : '已配置云端同步，但未登录（点右上角「账号」登录）';
+      body.appendChild(U.el('div', { class: 'muted', style: 'margin-top:4px;color:var(--accent)', text: syncTxt }));
+    } else {
+      body.appendChild(U.el('div', { class: 'muted', text: '未配置云端同步，数据仅存于本机浏览器。' }));
+    }
 
     body.appendChild(U.el('button', { class: 'btn ghost sm', style: 'margin-top:10px', text: '立即执行一次重置（演示）', onclick: function () { S.forceReset(); U.toast('已重置'); navigate(current); close(); } }));
 
@@ -104,6 +109,68 @@
     function setMode(mm) { S.setMode(mm); U.toast('已切换为' + (mm === 'daily' ? '每日重置' : '永久累计') + '模式'); navigate(current); }
   }
 
+  /* ---------- 云端同步 ---------- */
+  function updateSyncPill(status) {
+    var pill = U.$('#syncPill'); if (!pill) return;
+    var map = {
+      offline: ['● 本地', 'pill-offline'],
+      idle: ['✓ 已同步', 'pill-ok'],
+      syncing: ['↻ 同步中', 'pill-sync'],
+      error: ['⚠ 同步异常', 'pill-err']
+    };
+    var info = map[status] || map.offline;
+    pill.textContent = info[0];
+    pill.className = 'sync-pill ' + info[1];
+  }
+  function showLogin(show) { var o = U.$('#loginOverlay'); if (o) o.classList.toggle('hidden', !show); }
+
+  function pollHandler(m) {
+    App.Store.applyRemote(m);
+    var ae = document.activeElement;
+    // 不打断正在输入：若焦点在输入框/文本域，跳过本次重绘（数据已写入本地，下次轮询或切页即见）
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+    navigate(current);
+    U.toast('已同步最新数据');
+  }
+
+  async function onLoggedIn() {
+    showLogin(false);
+    updateSyncPill('syncing');
+    try {
+      var map = await App.Sync.pullAll();
+      App.Store.applyRemote(map);
+      App.Sync.seedVersions(map);
+      navigate(current);
+      App.Sync.startPolling(pollHandler, 20000);
+    } catch (e) {
+      U.toast('首次同步失败：' + (e.message || e));
+      App.Sync.startPolling(pollHandler, 20000);
+    }
+  }
+
+  function initSync() {
+    if (!App.Sync || !App.Sync.ENABLED) { updateSyncPill('offline'); return; }
+    App.Sync.setStatusCb(updateSyncPill);
+    if (App.Sync.loadSession() && App.Sync.isLoggedIn()) { onLoggedIn(); }
+    else { showLogin(true); }
+  }
+
+  // 登录表单
+  var loginMode = 'signin';
+  async function doLogin() {
+    var email = U.$('#loginEmail').value.trim();
+    var pwd = U.$('#loginPwd').value;
+    var msg = U.$('#loginMsg');
+    if (!email || !pwd) { msg.textContent = '请输入邮箱和密码'; return; }
+    if (pwd.length < 6) { msg.textContent = '密码至少 6 位'; return; }
+    msg.textContent = '处理中…';
+    try {
+      if (loginMode === 'signup') await App.Sync.signUp(email, pwd);
+      else await App.Sync.signIn(email, pwd);
+      await onLoggedIn();
+    } catch (e) { msg.textContent = e.message || '操作失败'; }
+  }
+
   /* ---------- 事件绑定 ---------- */
   U.$('#navMenu').addEventListener('click', function (e) {
     var btn = e.target.closest('.nav-item'); if (!btn) return;
@@ -111,16 +178,43 @@
   });
   U.$('#openSettings').addEventListener('click', openSettings);
 
+  // 登录相关
+  if (U.$('#loginSubmit')) {
+    U.$('#loginSubmit').addEventListener('click', doLogin);
+    U.$all('.ltab').forEach(function (t) {
+      t.addEventListener('click', function () {
+        U.$all('.ltab').forEach(function (x) { x.classList.remove('active'); });
+        t.classList.add('active');
+        loginMode = t.getAttribute('data-mode');
+        U.$('#loginSubmit').textContent = loginMode === 'signup' ? '注册并登录' : '登录';
+      });
+    });
+    U.$('#loginPwd').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
+    U.$('#loginEmail').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
+  }
+  U.$('#accountBtn').addEventListener('click', function () {
+    if (!App.Sync || !App.Sync.ENABLED) { U.toast('未配置云端同步'); return; }
+    if (App.Sync.isLoggedIn()) {
+      if (window.confirm('退出当前账号？本地数据保留，云端同步将暂停。')) {
+        App.Sync.logout(); updateSyncPill('offline'); U.toast('已退出登录');
+      }
+    } else { showLogin(true); }
+  });
+
   // 首次交互申请通知权限
   document.addEventListener('click', function once() {
     U.requestNotifyPermission();
     document.removeEventListener('click', once);
   });
 
+  // 供同步轮询重绘当前页
+  App.renderCurrent = function () { navigate(current); };
+
   /* ---------- 启动 ---------- */
   S.ensureDailyReset();
   navigate('daily-plan');
   scheduleReminders();
+  initSync();
   // 启动后若已过 5:00 且今日未采集，立即补采
   (function () { var hhmm = U.fmtTime(new Date()); if (hhmm >= '05:00' && App._videoAutoCollect) App._videoAutoCollect(); })();
 })();

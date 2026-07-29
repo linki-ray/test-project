@@ -28,8 +28,38 @@ App.Store = (function () {
 
   /* ---- 通用读写 ---- */
   function get(key, def) { var v = lsGet(key); return v === null ? (def !== undefined ? def : null) : v; }
-  function set(key, val) { lsSet(key, val); }
-  function del(key) { lsDel(key); }
+
+  // 同步上推（防抖）：仅登录且已配置时生效
+  var pushTimers = {};
+  function schedulePush(key, val) {
+    if (!(App.Sync && App.Sync.ENABLED && App.Sync.isLoggedIn())) return;
+    if (pushTimers[key]) clearTimeout(pushTimers[key]);
+    pushTimers[key] = setTimeout(function () {
+      delete pushTimers[key];
+      App.Sync.pushBucket(key, val).catch(function (e) { console.warn('同步上推失败', key, e); });
+    }, 600);
+  }
+  function set(key, val, opts) {
+    opts = opts || {};
+    lsSet(key, val);
+    if (!opts.silent) schedulePush(key, val);
+  }
+  function del(key) {
+    lsDel(key);
+    if (App.Sync && App.Sync.ENABLED && App.Sync.isLoggedIn()) {
+      App.Sync.deleteBucket(key).catch(function (e) { console.warn('同步删除失败', key, e); });
+    }
+  }
+
+  // 云端数据写回本地（silent，避免回环上推）；map: {bucket:{value,updated_at}}
+  function applyRemote(map) {
+    if (!map) return;
+    Object.keys(map).forEach(function (bucket) {
+      var v = map[bucket] ? map[bucket].value : null;
+      if (pushTimers[bucket]) { clearTimeout(pushTimers[bucket]); delete pushTimers[bucket]; }
+      lsSet(bucket, v);
+    });
+  }
 
   /* ---- 每日计划预设任务 ---- */
   var PRESET_TASKS = [
@@ -173,7 +203,7 @@ App.Store = (function () {
 
   return {
     todayStr: todayStr, getMode: getMode, setMode: setMode,
-    get: get, set: set, del: del,
+    get: get, set: set, del: del, applyRemote: applyRemote,
     getDailyPlan: getDailyPlan, saveDailyPlan: saveDailyPlan, getDailyPlanHistory: getDailyPlanHistory, archiveDailyPlan: archiveDailyPlan,
     freshPresets: freshPresets,
     getVideos: getVideos, saveVideos: saveVideos,

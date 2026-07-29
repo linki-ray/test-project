@@ -178,13 +178,12 @@ App.pages = App.pages || {};
 
     root.appendChild(wrap);
 
-    // 收藏列表
+    // 收藏列表（走 Store，自动云端同步）
     function favBar() {
-      var f = S.getTags('fin_fav') && JSON.parse(localStorage.getItem('ws_fin_fav') || '[]');
-      return f || [];
+      return S.get('fin_fav', []);
     }
     function addFav(item) {
-      var f = favBar(); f.push(item); localStorage.setItem('ws_fin_fav', JSON.stringify(f)); U.toast('已收藏：' + item.name);
+      var f = favBar(); f.push(item); S.set('fin_fav', f); U.toast('已收藏：' + item.name);
     }
 
     // 渲染大盘
