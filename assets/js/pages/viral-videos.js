@@ -11,39 +11,39 @@ App.pages['viral-videos'] = function (root) {
   var U = App.U, S = App.Store;
   App.U.clear(root);
 
-  var TRACKS = ['美妆', '穿搭', '美食', '剧情', '知识', '萌宠', '健身', '数码'];
+  var TRACKS = ['萌宠日常', '宠物科普', '宠物好物', '宠物剧情', '猫咪', '狗狗', '异宠', '萌宠穿搭'];
   var REASON_KEYS = [
     ['hook', '开头钩子'], ['emotion', '情绪共鸣'], ['twist', '剧情反转'],
     ['visual', '视觉画面'], ['copy', '文案话术'], ['bgm', '热门 BGM'], ['tag', '标签流量逻辑']
   ];
   var state = { platform: 'all', track: 'all', starred: 'all', dateFrom: '', dateTo: '', view: 'all', selected: {}, batchMode: false };
 
-  // 示例素材池（接入真实接口后替换）
+  // 示例素材池（接入真实接口后替换）—— 已聚焦宠物赛道，供结构参考
   var POOL = [
-    { platform: 'douyin', track: '美妆', title: '10秒伪素颜底妆教程', hot: 982000,
-      reason: { hook: '“化妆前 vs 化妆后只差这一步”直接抛结果', emotion: '素颜焦虑共鸣', twist: '结尾反转推荐平价替代', visual: '高清特写+前后对比分屏', copy: '新手也能学会的底妆公式', bgm: '轻快卡点热门BGM', tag: '#伪素颜 #新手化妆 双话题叠加热度' },
-      inspire: { script: '结果前置→分步演示→平价替代反转', shoot: '固定机位特写+分屏对比', copyTpl: '只差__就能__', topic: '平价底妆/学生党妆容' } },
-    { platform: 'xhs', track: '美食', title: '5分钟懒人电饭煲蛋糕', hot: 763000,
-      reason: { hook: '“不用烤箱也能成功”', emotion: '居家治愈感', twist: '翻车预警变成功', visual: '蒸汽升腾特写', copy: '手残党福音', bgm: '治愈系纯音乐', tag: '#懒人食谱 长尾流量' },
-      inspire: { script: '痛点→极简步骤→成品展示', shoot: '俯拍+成品特写', copyTpl: '__分钟搞定__', topic: '宿舍/租房简易美食' } },
-    { platform: 'douyin', track: '知识', title: '一个公式看懂复利', hot: 654000,
-      reason: { hook: '“为什么你存不下钱”', emotion: '财富焦虑', twist: '用奶茶举例反转', visual: '手写动画', copy: '越早越好', bgm: '悬疑转场音效', tag: '#理财干货 知识普惠' },
-      inspire: { script: '生活化类比→公式→行动建议', shoot: '白板手写+字幕', copyTpl: '其实__就是__', topic: '通识理财/认知提升' } },
-    { platform: 'xhs', track: '穿搭', title: '小个子显高万能公式', hot: 821000,
-      reason: { hook: '“150也能穿出170”', emotion: '身材焦虑治愈', twist: '三套对比', visual: '全身镜自拍九宫格', copy: '照着穿不出错', bgm: '时尚走秀BGM', tag: '#小个子穿搭 精准人群' },
-      inspire: { script: '痛点→公式→搭配示范', shoot: '同款单品多角度', copyTpl: '__显高__', topic: '微胖/梨形穿搭' } },
-    { platform: 'douyin', track: '剧情', title: '合租室友深夜反转', hot: 1130000,
-      reason: { hook: '“你听过一个声音吗”', emotion: '孤独共鸣', twist: '恐怖转温情', visual: '暗调运镜', copy: '结局泪目', bgm: '悬疑→温情', tag: '#深夜情感 情绪向' },
-      inspire: { script: '悬念开头→铺垫→温情反转', shoot: '一镜到底+变光', copyTpl: '以为__其实__', topic: '都市情感短剧' } },
-    { platform: 'xhs', track: '健身', title: '办公室肩颈放松操', hot: 542000,
-      reason: { hook: '“低头族必看”', emotion: '亚健康共鸣', twist: '30秒见效', visual: '真人示范GIF', copy: '跟着做', bgm: '轻节奏', tag: '#打工人养生' },
-      inspire: { script: '问题→动作拆解→效果', shoot: '侧面示范+字幕', copyTpl: '__分钟缓解__', topic: '居家理疗/普拉提' } },
-    { platform: 'douyin', track: '萌宠', title: '猫主子第一次下楼', hot: 905000,
-      reason: { hook: '“它紧张到发抖”', emotion: '萌系治愈', twist: '最后撒娇', visual: '第一视角跟拍', copy: '谁懂啊', bgm: '可爱音效', tag: '#云吸猫 情绪流量' },
-      inspire: { script: '反差萌→过程→治愈结尾', shoot: '跟拍+特写', copyTpl: '没想到__', topic: '宠物日常/vlog' } },
-    { platform: 'xhs', track: '数码', title: '百元耳机横评', hot: 431000,
-      reason: { hook: '“别再交智商税”', emotion: '避坑心理', twist: '黑马胜出', visual: '参数对比表', copy: '闭眼入', bgm: '科技感', tag: '#数码测评' },
-      inspire: { script: '结论先行→横评→推荐', shoot: '产品摆拍+表格', copyTpl: '__元买__', topic: '平价好物/学生数码' } }
+    { platform: 'douyin', track: '猫咪', title: '猫咪第一次吃冻干的反应', hot: 982000,
+      reason: { hook: '“它闻了闻直接愣住”', emotion: '治愈萌系共鸣', twist: '最后疯狂讨要更多', visual: '近距离特写猫咪表情', copy: '谁懂啊这个表情', bgm: '可爱音效', tag: '#萌宠日常 #猫咪 情绪流量' },
+      inspire: { script: '反差萌→真实反应→治愈结尾', shoot: '近距离抓拍+慢动作', copyTpl: '没想到__', topic: '猫咪反应视频/萌宠日常' } },
+    { platform: 'xhs', track: '宠物好物', title: '平价猫粮测评红黑榜', hot: 763000,
+      reason: { hook: '“别再交智商税”', emotion: '养宠避坑心理', twist: '平价黑马胜出', visual: '产品对比图+成分表', copy: '闭眼入不踩雷', bgm: '科技感', tag: '#宠物好物 精准人群' },
+      inspire: { script: '结论先行→横评→推荐', shoot: '产品摆拍+对比表格', copyTpl: '__元买__', topic: '平价猫粮/宠物用品' } },
+    { platform: 'douyin', track: '宠物科普', title: '猫咪为什么半夜跑酷', hot: 654000,
+      reason: { hook: '“你家猫也这样？”', emotion: '铲屎官共鸣', twist: '科学原理解释', visual: '手绘动画+实拍', copy: '涨知识了', bgm: '悬疑转场', tag: '#宠物科普 知识普惠' },
+      inspire: { script: '现象→原理→养猫建议', shoot: '字幕+实拍穿插', copyTpl: '其实__是__', topic: '养猫误区/宠物科普' } },
+    { platform: 'xhs', track: '萌宠穿搭', title: '狗狗秋冬穿衣搭配', hot: 821000,
+      reason: { hook: '“这样穿太可爱了”', emotion: '治愈种草', twist: '三套风格对比', visual: '全身镜自拍九宫格', copy: '照着穿不出错', bgm: '时尚走秀BGM', tag: '#萌宠穿搭 精准人群' },
+      inspire: { script: '痛点→搭配公式→示范', shoot: '同款单品多角度', copyTpl: '__显可爱__', topic: '小型犬/猫咪穿搭' } },
+    { platform: 'douyin', track: '宠物剧情', title: '捡到流浪猫后它报恩了', hot: 1130000,
+      reason: { hook: '“它在门口等了你一夜”', emotion: '孤独温情共鸣', twist: '反转治愈', visual: '暗调运镜+暖光', copy: '结局泪目', bgm: '悬疑→温情', tag: '#宠物剧情 情绪向' },
+      inspire: { script: '悬念开头→铺垫→温情反转', shoot: '一镜到底+变光', copyTpl: '以为__其实__', topic: '救助故事/宠物剧情' } },
+    { platform: 'xhs', track: '狗狗', title: '每天遛狗30分钟打卡', hot: 542000,
+      reason: { hook: '“每天30分钟改变”', emotion: '自律共鸣', twist: '狗狗肉眼变帅', visual: '户外跟拍', copy: '跟着打卡', bgm: '轻快节奏', tag: '#遛狗 自律打卡' },
+      inspire: { script: '问题→动作拆解→效果', shoot: '侧面跟拍+字幕', copyTpl: '__分钟__', topic: '遛狗vlog/养狗日常' } },
+    { platform: 'douyin', track: '猫咪', title: '布偶猫第一次洗澡现场', hot: 905000,
+      reason: { hook: '“第一次洗澡名场面”', emotion: '搞笑萌系', twist: '意外超级配合', visual: '湿身特写+泡泡', copy: '笑死我了', bgm: '搞笑音效', tag: '#猫咪 搞笑流量' },
+      inspire: { script: '铺垫→冲突→反转配合', shoot: '固定机位全景', copyTpl: '没想到__', topic: '猫咪洗澡/搞笑萌宠' } },
+    { platform: 'xhs', track: '异宠', title: '仓鼠别墅布置攻略', hot: 431000,
+      reason: { hook: '“小窝还能这样改”', emotion: '种草治愈', twist: '平价改造惊艳', visual: '俯拍全景', copy: '手残党也会', bgm: '治愈系纯音乐', tag: '#异宠 小众圈层' },
+      inspire: { script: '痛点→改造步骤→成品', shoot: '延时摄影+字幕', copyTpl: '__元搞定__', topic: '仓鼠/异宠布置' } }
   ];
 
   function genSample(count) {
