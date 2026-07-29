@@ -144,13 +144,21 @@ App.pages = App.pages || {};
 
     // 大盘
     var idxCard = U.el('div', { class: 'card' });
-    idxCard.appendChild(U.el('div', { class: 'card-title', html: '当日大盘 <span class="card-sub" id="idxSrc"></span>' }));
+    idxCard.appendChild(U.el('div', { class: 'card-title' }, [
+      document.createTextNode('当日大盘 '),
+      U.el('span', { class: 'src-tag', id: 'idxSrc' }),
+      U.el('button', { class: 'btn ghost xs', style: 'float:right;margin-top:-2px', text: '🔄 刷新', onclick: function () { loadIndices(true); } })
+    ]));
     var idxBox = U.el('div'); idxCard.appendChild(idxBox);
     wrap.appendChild(idxCard);
 
     // 板块题材
     var secCard = U.el('div', { class: 'card' });
-    secCard.appendChild(U.el('div', { class: 'card-title', html: '板块题材 <span class="card-sub" id="secSrc"></span>' }));
+    secCard.appendChild(U.el('div', { class: 'card-title' }, [
+      document.createTextNode('板块题材 '),
+      U.el('span', { class: 'src-tag', id: 'secSrc' }),
+      U.el('button', { class: 'btn ghost xs', style: 'float:right;margin-top:-2px', text: '🔄 刷新', onclick: function () { loadSectors(true); } })
+    ]));
     var secBox = U.el('div', { class: 'grid c2', id: 'secBox' }); secCard.appendChild(secBox);
     wrap.appendChild(secCard);
 
@@ -227,22 +235,25 @@ App.pages = App.pages || {};
       U.modal({ title: '收藏说明', body: '点击任意条目右侧 ☆ 即可收藏到本地。收藏与历史快照均永久留存，不受存储模式影响。' });
     });
 
-    // 拉取数据
-    // 大盘
-    var secids = '1.000001,0.399001,0.399006,1.000688';
-    emJSON('https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&secids=' + secids + '&fields=f12,f13,f14,f43,f168,f169,f170,f116')
-      .then(function (j) {
-        var list = (j.data && j.data.diff || []).map(function (d) { return { code: d.f12, name: d.f14, price: d.f43, chgPct: d.f168, chg: d.f169 }; });
-        U.$('#idxSrc').textContent = '· 实时'; showIdx(list); saveSnap('indices', list);
-      }).catch(function () { U.$('#idxSrc').textContent = '· 示例'; showIdx(DEMO_INDICES); saveSnap('indices', DEMO_INDICES); });
-
-    // 板块
-    emJSON('https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=12&po=1&fid=f3&fs=m:90+t:2&fields=f12,f14,f3')
-      .then(function (j) {
-        var list = (j.data && j.data.diff || []).map(function (d) { return { code: d.f12, name: d.f14, chgPct: d.f3 }; });
-        U.$('#secSrc').textContent = '· 实时'; showSectors(list); saveSnap('sectors', list);
-      }).catch(function () { U.$('#secSrc').textContent = '· 示例'; showSectors(DEMO_SECTORS); saveSnap('sectors', DEMO_SECTORS); });
-
+    // 拉取数据（联网实时）
+    function loadIndices(manual) {
+      if (manual) U.$('#idxSrc').innerHTML = '<span class="live-dot wait"></span> 刷新中…';
+      var secids = '1.000001,0.399001,0.399006,1.000688';
+      emJSON('https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&secids=' + secids + '&fields=f12,f13,f14,f43,f168,f169,f170,f116')
+        .then(function (j) {
+          var list = (j.data && j.data.diff || []).map(function (d) { return { code: d.f12, name: d.f14, price: d.f43, chgPct: d.f168, chg: d.f169 }; });
+          U.$('#idxSrc').innerHTML = '<span class="live-dot on"></span> 实时'; showIdx(list); saveSnap('indices', list);
+        }).catch(function () { U.$('#idxSrc').innerHTML = '<span class="live-dot off"></span> 示例'; showIdx(DEMO_INDICES); saveSnap('indices', DEMO_INDICES); });
+    }
+    function loadSectors(manual) {
+      if (manual) U.$('#secSrc').innerHTML = '<span class="live-dot wait"></span> 刷新中…';
+      emJSON('https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=12&po=1&fid=f3&fs=m:90+t:2&fields=f12,f14,f3')
+        .then(function (j) {
+          var list = (j.data && j.data.diff || []).map(function (d) { return { code: d.f12, name: d.f14, chgPct: d.f3 }; });
+          U.$('#secSrc').innerHTML = '<span class="live-dot on"></span> 实时'; showSectors(list); saveSnap('sectors', list);
+        }).catch(function () { U.$('#secSrc').innerHTML = '<span class="live-dot off"></span> 示例'; showSectors(DEMO_SECTORS); saveSnap('sectors', DEMO_SECTORS); });
+    }
+    loadIndices(); loadSectors();
     // 资讯（示例，标注清晰）
     showNews(DEMO_NEWS); saveSnap('news', DEMO_NEWS);
 
