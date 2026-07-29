@@ -1,0 +1,7 @@
+# 本地记忆 / 运行时数据，不入库
+.workbuddy/
+
+# 系统 / 临时
+.DS_Store
+Thumbs.db
+*.log

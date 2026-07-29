@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>个人专属工作台</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- 左侧竖向导航栏 -->
+    <aside id="nav">
+      <div class="nav-brand">
+        <span class="brand-dot"></span>
+        <span class="brand-text">工作台</span>
+      </div>
+      <nav class="nav-menu" id="navMenu">
+        <button class="nav-item active" data-page="daily-plan">
+          <svg viewBox="0 0 24 24" class="nav-ico"><path d="M4 6h11M4 12h11M4 18h7M19 6h1M19 12h1M19 18h1"/></svg>
+          <span>每日计划</span>
+        </button>
+        <button class="nav-item" data-page="viral-videos">
+          <svg viewBox="0 0 24 24" class="nav-ico"><path d="M12 3c1 3-1 4-1 6a3 3 0 0 0 5 2c.6 1 .5 2 .5 3a5.5 5.5 0 1 1-11 0c0-2 1-3 2-4 .5-2 1-4 4.5-7z"/></svg>
+          <span>爆款视频</span>
+        </button>
+        <button class="nav-item" data-page="inspiration">
+          <svg viewBox="0 0 24 24" class="nav-ico"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3 11c.6.4 1 1 1 2h4c0-1 .4-1.6 1-2a6 6 0 0 0-3-11z"/></svg>
+          <span>灵感记录</span>
+        </button>
+        <button class="nav-item" data-page="finance">
+          <svg viewBox="0 0 24 24" class="nav-ico"><path d="M4 19V5M4 19h16M8 16l3-4 3 2 4-6"/></svg>
+          <span>金融热点</span>
+        </button>
+        <button class="nav-item" data-page="checkin">
+          <svg viewBox="0 0 24 24" class="nav-ico"><path d="M5 13l4 4L19 7M4 5h16v14H4z"/></svg>
+          <span>打卡计划</span>
+        </button>
+      </nav>
+      <button class="nav-settings" id="openSettings" title="存储设置">
+        <svg viewBox="0 0 24 24" class="nav-ico"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.3-2.6h-4l-.3 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.3 2.6h4l.3-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5c.1-.3.1-.7.1-1z"/></svg>
+        <span>存储</span>
+      </button>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main id="content">
+      <header id="topbar">
+        <h1 id="pageTitle">每日计划</h1>
+        <div id="clock" class="clock"></div>
+      </header>
+      <section id="pageRoot" class="page-root"></section>
+    </main>
+  </div>
+
+  <!-- 弹窗容器 -->
+  <div id="modalRoot"></div>
+  <!-- 应用内提醒容器 -->
+  <div id="toastRoot" class="toast-root"></div>
+  <div id="notifyRoot" class="notify-root"></div>
+
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/utils.js"></script>
+  <script src="assets/js/pages/daily-plan.js"></script>
+  <script src="assets/js/pages/viral-videos.js"></script>
+  <script src="assets/js/pages/inspiration.js"></script>
+  <script src="assets/js/pages/finance.js"></script>
+  <script src="assets/js/pages/checkin.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
