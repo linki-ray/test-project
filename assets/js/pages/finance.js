@@ -189,17 +189,19 @@ App.pages = App.pages || {};
     // 渲染大盘
     function showIdx(list) {
       U.clear(idxBox);
+      var grid = U.el('div', { class: 'grid c2' });
       list.forEach(function (x) {
         var up = x.chgPct >= 0;
-        var r = U.el('div', { class: 'quote-row' });
-        r.appendChild(U.el('div', {}, [U.el('div', { text: x.name, style: 'font-weight:600' }), U.el('div', { class: 'muted', text: x.code })]));
-        var right = U.el('div', { style: 'text-align:right' });
-        right.appendChild(U.el('div', { class: up ? 'up' : 'down', style: 'font-weight:700', text: x.price.toFixed(2) }));
-        right.appendChild(U.el('div', { class: up ? 'up' : 'down', text: (up ? '+' : '') + x.chgPct.toFixed(2) + '%' }));
-        r.appendChild(right);
-        r.appendChild(U.el('button', { class: 'icon-btn', html: '☆', title: '收藏', onclick: function () { addFav({ type: 'index', name: x.name, code: x.code, price: x.price, chgPct: x.chgPct }); } }));
-        idxBox.appendChild(r);
+        var c = U.el('div', { class: 'stat-card', style: 'position:relative;text-align:left' });
+        var top = U.el('div', { style: 'display:flex;justify-content:space-between;align-items:flex-start' });
+        top.appendChild(U.el('div', { style: 'font-weight:700;font-size:14px', text: x.name }));
+        top.appendChild(U.el('button', { class: 'icon-btn', html: '☆', title: '收藏', style: 'margin:-6px -6px 0 0', onclick: function () { addFav({ type: 'index', name: x.name, code: x.code, price: x.price, chgPct: x.chgPct }); } }));
+        c.appendChild(top);
+        c.appendChild(U.el('div', { style: 'font-size:22px;font-weight:800;margin:8px 0 4px;color:' + (up ? 'var(--red)' : 'var(--green)'), text: x.price.toFixed(2) }));
+        c.appendChild(U.el('div', { style: 'font-size:13px;font-weight:700;color:' + (up ? 'var(--red)' : 'var(--green)'), text: (up ? '+' : '') + x.chgPct.toFixed(2) + '% · ' + (up ? '+' : '') + x.chg.toFixed(2) }));
+        grid.appendChild(c);
       });
+      idxBox.appendChild(grid);
     }
     function showSectors(list) {
       U.clear(secBox);

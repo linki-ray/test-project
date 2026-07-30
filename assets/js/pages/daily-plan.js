@@ -15,14 +15,18 @@ App.pages['daily-plan'] = function (root) {
 
   // ---- 顶部进度卡片 ----
   var progressCard = U.el('div', { class: 'card' });
-  var progressWrap = U.el('div', { class: 'progress-wrap' });
+  var progressHeader = U.el('div', { style: 'display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px' });
+  progressHeader.appendChild(U.el('div', {}, [
+    U.el('div', { style: 'font-size:13px;color:var(--text-3);font-weight:600', text: '今日完成进度' }),
+    U.el('div', { style: 'font-size:12px;color:var(--text-3);margin-top:2px', id: 'dpDate' })
+  ]));
+  var ptext = U.el('div', { style: 'font-size:26px;font-weight:800;color:var(--brand)', id: 'dpProgressText' });
+  progressHeader.appendChild(ptext);
+  progressCard.appendChild(progressHeader);
   var bar = U.el('div', { class: 'progress-bar' });
   var fill = U.el('div', { class: 'progress-fill' });
   bar.appendChild(fill);
-  var ptext = U.el('div', { class: 'progress-text' });
-  progressWrap.appendChild(ptext); progressWrap.appendChild(bar);
-  progressCard.appendChild(U.el('div', { class: 'card-title', html: '今日完成进度 <span class="card-sub" id="dpDate"></span>' }));
-  progressCard.appendChild(progressWrap);
+  progressCard.appendChild(bar);
   root.appendChild(progressCard);
 
   // ---- 标签筛选 + 批量 ----
@@ -89,9 +93,9 @@ App.pages['daily-plan'] = function (root) {
 
   function refresh() {
     dp = S.getDailyPlan();
-    U.$('#dpDate').textContent = ' · ' + dp.date + (S.getMode() === 'daily' ? '（每日重置模式）' : '（永久累计模式）');
+    U.$('#dpDate').textContent = dp.date + (S.getMode() === 'daily' ? ' · 每日重置' : ' · 永久累计');
     var total = dp.tasks.length, done = dp.tasks.filter(function (t) { return t.done; }).length;
-    ptext.textContent = '已完成 ' + done + '/' + total + ' 项';
+    ptext.textContent = done + '/' + total;
     fill.style.width = (total ? (done / total * 100) : 0) + '%';
     refreshTagBar(); refreshTagSelect(); refreshList();
   }
