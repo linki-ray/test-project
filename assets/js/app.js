@@ -9,7 +9,7 @@
   var TITLES = {
     'daily-plan': '每日计划', 'viral-videos': '爆款抖音小红书视频',
     'pet-ops': '宠物运营中心',
-    'inspiration': '灵感记录', 'finance': '全球金融热点', 'checkin': '打卡计划'
+    'inspiration': '灵感记录', 'finance': '全球金融热点', 'checkin': '打卡计划', 'vv-analyzer': '视频智能解析', 'vv-library': '爆款素材库'
   };
 
   function navigate(page) {
