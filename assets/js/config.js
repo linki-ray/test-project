@@ -14,7 +14,7 @@ window.APP_CONFIG = {
   // 联网热榜接口：由 Cloudflare Pages 服务端函数 /api/trending 提供真实数据。
   // 使用完整地址，保证 github.io / 本地调试 / PWA 桌面模式都能调用。
   TRENDING_API: 'https://test-project-ek2.pages.dev/api/trending',
-  // 金融数据接口：由 Cloudflare Pages 服务端函数 /api/finance 代理（绕开浏览器跨域），
-  // 大盘/个股行情走腾讯自选股，板块/K线走东方财富，均为真实联网数据。
-  FINANCE_API: 'https://test-project-ek2.pages.dev/api/finance'
+  // 个股K线接口：由 Cloudflare Pages 服务端函数 /api/kline 代理新浪财经（绕开浏览器跨域），
+  // 大盘/个股行情/板块龙头直接走腾讯自选股 qt.gtimg.cn（浏览器 JSONP）。均非东方财富。
+  KLINE_API: 'https://test-project-ek2.pages.dev/api/kline'
 };

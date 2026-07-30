@@ -4,8 +4,10 @@
    4.3 个股综合分析查询（行情 / K线 / MACD / 支撑压力 / 星级 / 建议）
    注：原 4.2 自动筛选策略为私有策略，
        已从公开代码中移除，不随本仓库分发。
-   数据源：东方财富公开行情接口（浏览器跨域可用）；
-   接口不可用时自动回退【示例数据】，页面会明确标注。
+   数据源（均非东方财富）：
+   - 大盘 / 个股行情 / 板块龙头：腾讯自选股行情 qt.gtimg.cn（浏览器 JSONP，GBK 原生解码，中文正常）
+   - 个股 K线历史：新浪财经，经 Cloudflare 函数 /api/kline 代理（绕开浏览器跨域）
+   接口不可用时明确提示「获取失败」，不再回退假数据。
    ========================================================= */
 window.App = window.App || {};
 App.pages = App.pages || {};
@@ -49,17 +51,12 @@ App.pages = App.pages || {};
     });
   }
 
-  /* ---------- 工具：东方财富 secid ---------- */
-  function toSecid(code) {
-    code = String(code).toLowerCase();
-    var m = code.match(/^([sh|sz|bk]{2})(\d+)$/);
-    if (m) { var pre = m[1], num = m[2]; return (pre === 'sh' ? '1.' : '0.') + num; }
-    if (/^\d{6}$/.test(code)) { return (code[0] === '6' ? '1.' : '0.') + code; }
-    return null;
-  }
-
-  function emJSON(url) {
-    return U.fetchJSON(url, 9000).then(function (j) { return j; });
+  /* ---------- 工具：生成统一代码（sh600519 / sz300750 / bj...） ---------- */
+  function marketCode(code) {
+    code = String(code).replace(/\s/g, '');
+    if (/^(sh|sz|bj)\d{6}$/i.test(code)) return code.toLowerCase();
+    if (/^\d{6}$/.test(code)) return (code[0] === '6' ? 'sh' : (code[0] === '8' || code[0] === '4' ? 'bj' : 'sz')) + code;
+    return code;
   }
 
   /* ---------- 指标计算 ---------- */
@@ -80,29 +77,16 @@ App.pages = App.pages || {};
     return { dif: dif, dea: dea, macd: macd };
   }
 
-  /* ---------- 东方财富 K线解析 ---------- */
-  function fetchKline(secid, klt, lmt) {
-    var url = 'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=' + secid +
-      '&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58&klt=' + klt + '&fqt=1&end=20500101&lmt=' + lmt;
-    return emJSON(url).then(function (j) {
-      if (!j || !j.data || !j.data.klines) throw new Error('no kline');
-      return j.data.klines.map(function (s) {
-        var p = s.split(',');
-        return { date: p[0], open: +p[1], close: +p[2], high: +p[3], low: +p[4], vol: +p[5] };
+  /* ---------- 新浪 K线（经 Cloudflare /api/kline 代理，绕开浏览器跨域） ---------- */
+  function fetchKline(symbol, scale, datalen) {
+    var base = (window.APP_CONFIG && window.APP_CONFIG.KLINE_API) || '/api/kline';
+    var url = base + '?symbol=' + encodeURIComponent(symbol) +
+      '&scale=' + (scale || 240) + '&datalen=' + (datalen || 120);
+    return U.fetchJSON(url, 12000).then(function (j) {
+      if (!j || !j.ok || !j.items || !j.items.length) throw new Error('no kline');
+      return j.items.map(function (d) {
+        return { date: d.date, open: +d.open, close: +d.close, high: +d.high, low: +d.low, vol: +d.vol };
       });
-    });
-  }
-  function fetchQuote(secid) {
-    var url = 'https://push2.eastmoney.com/api/qt/stock/get?secid=' + secid +
-      '&fields=f12,f13,f14,f43,f44,f45,f46,f47,f48,f57,f58,f60,f116,f117,f161,f168,f169,f170,f171';
-    return emJSON(url).then(function (j) {
-      if (!j || !j.data) throw new Error('no quote');
-      var d = j.data;
-      return {
-        code: d.f57, name: d.f58, price: d.f43, high: d.f44, low: d.f45, open: d.f46,
-        vol: d.f47, amount: d.f48, prevClose: d.f60, mv: d.f116, floatMv: d.f117,
-        turnover: d.f161, chgPct: d.f168, chg: d.f169, amplitude: d.f170, volumeRatio: d.f171
-      };
     });
   }
   function searchStock(kw) {
@@ -124,18 +108,7 @@ App.pages = App.pages || {};
     });
   }
 
-  /* ---------- 示例回退数据 ---------- */
-  var DEMO_INDICES = [
-    { code: '000001', name: '上证指数', price: 3210.45, chgPct: 0.62, chg: 19.8, turnover: 0.8, amount: 3.2e11 },
-    { code: '399001', name: '深证成指', price: 10120.33, chgPct: 0.91, chg: 91.2, turnover: 1.4, amount: 4.1e11 },
-    { code: '399006', name: '创业板指', price: 2056.77, chgPct: 1.35, chg: 27.4, turnover: 2.1, amount: 1.5e11 }
-  ];
-  var DEMO_SECTORS = [
-    { code: 'BK0735', name: '半导体', chgPct: 3.2 }, { code: 'BK0473', name: '酿酒行业', chgPct: 2.1 },
-    { code: 'BK0481', name: '银行', chgPct: -0.4 }, { code: 'BK1036', name: '光伏设备', chgPct: 2.8 },
-    { code: 'BK0437', name: '汽车整车', chgPct: 1.6 }, { code: 'BK0501', name: '家电行业', chgPct: 0.9 },
-    { code: 'BK0448', name: '钢铁行业', chgPct: -1.2 }, { code: 'BK0701', name: '软件开发', chgPct: 1.1 }
-  ];
+  /* ---------- 示例资讯（明确标注「示例」，非行情数据） ---------- */
   var DEMO_NEWS = [
     { title: '央行公开市场净投放，流动性边际宽松', time: '09:15', tag: '宏观' },
     { title: '半导体板块获主力资金大幅流入', time: '10:02', tag: '题材' },
@@ -244,9 +217,9 @@ App.pages = App.pages || {};
       list.forEach(function (x) {
         var up = x.chgPct >= 0;
         var c = U.el('div', { class: 'card', style: 'margin-bottom:0;background:var(--surface-2);padding:12px' });
-        c.appendChild(U.el('div', { style: 'font-weight:600', text: x.name }));
+        c.appendChild(U.el('div', { style: 'font-weight:600', text: x.name + (x.lead ? ' · ' + x.lead : '') }));
         c.appendChild(U.el('div', { class: up ? 'up' : 'down', style: 'font-weight:700', text: (up ? '+' : '') + x.chgPct.toFixed(2) + '%' }));
-        c.appendChild(U.el('button', { class: 'icon-btn', html: '☆', style: 'float:right;margin-top:-28px', onclick: function () { addFav({ type: 'sector', name: x.name, code: x.code, chgPct: x.chgPct }); } }));
+        c.appendChild(U.el('button', { class: 'icon-btn', html: '☆', style: 'float:right;margin-top:-28px', onclick: function () { addFav({ type: 'sector', name: x.name, chgPct: x.chgPct }); } }));
         secBox.appendChild(c);
       });
     }
@@ -285,16 +258,34 @@ App.pages = App.pages || {};
           if (!manual) U.toast('大盘数据获取失败，请检查网络或稍后重试');
         });
     }
+    // 板块龙头（腾讯自选股真实行情 qt.gtimg.cn）。展示各板块代表股实时涨跌均值。
+    var SECTOR_LEADERS = [
+      { name: '酿酒', codes: ['sh600519', 'sz000858'] },
+      { name: '半导体', codes: ['sh688981', 'sz002371'] },
+      { name: '新能源', codes: ['sz300750', 'sz002594'] },
+      { name: '银行', codes: ['sh601398', 'sh600036'] },
+      { name: '券商', codes: ['sh600030', 'sh600837'] },
+      { name: '医药', codes: ['sh600276', 'sz300760'] },
+      { name: '地产', codes: ['sh600048', 'sz000002'] },
+      { name: '家电', codes: ['sz000333', 'sh600690'] }
+    ];
     function loadSectors(manual) {
       if (manual) U.$('#secSrc').innerHTML = '<span class="live-dot wait"></span> 刷新中…';
-      emJSON('https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=20&po=1&fid=f3&fs=m:90+t:2&fields=f12,f14,f3')
-        .then(function (j) {
-          var diff = (j.data && j.data.diff) || {};
-          var arr = Array.isArray(diff) ? diff : Object.values(diff);
-          var list = arr.map(function (d) { return { code: d.f12, name: d.f14, chgPct: (d.f3 || 0) / 100 }; }).filter(function (x) { return x.name; });
-          if (!list.length) throw new Error('empty');
-          showSectors(list); saveSnap('sectors', list);
-          U.$('#secSrc').innerHTML = '<span class="live-dot on"></span> 实时';
+      var allCodes = [];
+      SECTOR_LEADERS.forEach(function (s) { s.codes.forEach(function (c) { allCodes.push(c); }); });
+      jsonpTencent(allCodes.join(','))
+        .then(function (list) {
+          if (!list || !list.length) throw new Error('empty');
+          var byCode = {};
+          list.forEach(function (x) { byCode[x.code] = x; });
+          var out = SECTOR_LEADERS.map(function (s) {
+            var leads = s.codes.map(function (c) { return byCode[c]; }).filter(Boolean);
+            var chgPct = leads.length ? leads.reduce(function (a, b) { return a + b.chgPct; }, 0) / leads.length : 0;
+            var leadName = leads.map(function (l) { return l.name; }).join('/');
+            return { name: s.name, chgPct: chgPct, lead: leadName, codes: s.codes };
+          });
+          showSectors(out); saveSnap('sectors', out);
+          U.$('#secSrc').innerHTML = '<span class="live-dot on"></span> 腾讯实时';
         }).catch(function () {
           U.$('#secSrc').innerHTML = '<span class="live-dot off"></span> 获取失败';
         });
@@ -348,20 +339,18 @@ App.pages = App.pages || {};
     }
 
     function analyze(code) {
-      code = String(code).replace(/^(sh|sz)/i, '');
+      code = String(code).replace(/^(sh|sz|bj)/i, '');
       U.clear(reportBox); reportBox.appendChild(U.el('div', { class: 'empty', text: '加载行情与分析中…' }));
-      var secid = toSecid(code);
-      if (!secid) { U.toast('代码格式不正确'); return; }
+      var sym = marketCode(code);
       Promise.all([
-        jsonpTencent(tencentCode(code)),
-        fetchKline(secid, 101, 120),
-        fetchKline(secid, 102, 60)
+        jsonpTencent(sym),
+        fetchKline(sym, 240, 120)
       ]).then(function (res) {
-        var qlist = res[0], daily = res[1], weekly = res[2];
+        var qlist = res[0], daily = res[1];
         if (!qlist || !qlist.length) throw new Error('quote failed');
         var q = qlist[0];
         if (!daily || !daily.length) throw new Error('kline failed');
-        buildReport(q, daily, weekly || [], code); saveHist(code, q.name);
+        buildReport(q, daily, [], code); saveHist(code, q.name);
       }).catch(function () {
         reportBox.innerHTML = ''; reportBox.appendChild(U.el('div', { class: 'empty', text: '行情接口暂不可用，请稍后重试（需联网）' }));
       });
