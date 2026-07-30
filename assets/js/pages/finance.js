@@ -90,21 +90,37 @@ App.pages = App.pages || {};
     });
   }
   function searchStock(kw) {
-    var url = 'https://smartbox.gtimg.cn/s3/?t=all&q=' + encodeURIComponent(kw) + '&cb=__cb__';
+    // 腾讯 smartbox 实际返回全局变量：v_hint="sh~600519~贵州茅台~gzmt~GP-A"
+    // （部分旧接口返回 v_smartbox=[...] 数组，这里一并兼容）
     return new Promise(function (resolve) {
       var s = document.createElement('script');
-      window.__cb__ = function (r) {
+      var done = false;
+      try { delete window.v_hint; } catch (e) {}
+      try { delete window.v_smartbox; } catch (e) {}
+      function finish() {
+        if (done) return; done = true;
         var out = [];
         try {
-          var items = (r && r.data || []);
-          items.forEach(function (g) { (g.item || []).forEach(function (it) { if (it[0] === 'stock') out.push({ code: it[1], name: it[2], market: it[4] }); }); });
+          var raw = window.v_hint;
+          if (typeof raw === 'string' && raw && raw !== 'N') {
+            var parts = raw.split('~');
+            var market = parts[0], code = parts[1], name = parts[2];
+            if (code && name && /^\d{6}$/.test(code)) out.push({ code: code, name: name, market: market });
+          }
+          if (Array.isArray(window.v_smartbox)) {
+            window.v_smartbox.forEach(function (g) {
+              if (g && Array.isArray(g) && g[0] === 'stock' && g[1] && g[2]) out.push({ code: g[1], name: g[2], market: g[4] });
+            });
+          }
         } catch (e) {}
         resolve(out.slice(0, 12));
-        s.remove();
-      };
-      s.src = url.replace('__cb__', 'window.__cb__');
-      s.onerror = function () { resolve([]); s.remove(); };
+        try { s.remove(); } catch (e) {}
+      }
+      s.onload = finish;
+      s.onerror = function () { resolve([]); try { s.remove(); } catch (e) {} };
+      s.src = 'https://smartbox.gtimg.cn/s3/?t=all&q=' + encodeURIComponent(kw);
       document.body.appendChild(s);
+      setTimeout(finish, 6000); // 兜底：避免脚本异常导致一直 pending
     });
   }
 
@@ -330,11 +346,20 @@ App.pages = App.pages || {};
       U.clear(suggest); suggest.appendChild(U.el('div', { class: 'muted', text: '搜索中…' }));
       searchStock(kw).then(function (list) {
         U.clear(suggest);
-        if (!list.length) { suggest.appendChild(U.el('div', { class: 'empty', text: '未找到，可直接输入6位代码查询' })); return; }
-        list.forEach(function (it) {
-          var b = U.el('button', { class: 'btn ghost sm', style: 'margin:0 6px 6px 0', text: it.name + '(' + it.code + ')', onclick: function () { input.value = it.code; analyze(it.code); } });
-          suggest.appendChild(b);
-        });
+        if (list.length) {
+          list.forEach(function (it) {
+            var b = U.el('button', { class: 'btn ghost sm', style: 'margin:0 6px 6px 0', text: it.name + '(' + it.code + ')', onclick: function () { input.value = it.code; analyze(it.code); } });
+            suggest.appendChild(b);
+          });
+          return;
+        }
+        // 搜索无结果：若输入为 6 位代码，直接分析（腾讯模糊匹配有时仅返回核心词）
+        if (/^\d{6}$/.test(kw)) {
+          suggest.appendChild(U.el('div', { class: 'muted', text: '未匹配到名称，已按代码 ' + kw + ' 直接查询 ↓' }));
+          analyze(kw);
+          return;
+        }
+        suggest.appendChild(U.el('div', { class: 'empty', text: '未找到，请输入 6 位代码（如 600519）或完整股票名（如 贵州茅台）' }));
       });
     }
 
