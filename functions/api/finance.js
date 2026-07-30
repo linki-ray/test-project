@@ -76,12 +76,21 @@ function parseKline(j) {
 
 /* ---------- 抓取 ---------- */
 async function fetchText(url) {
-  const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://gu.qq.com/' } });
+  const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Referer': 'https://gu.qq.com/' } });
   if (!r.ok) throw new Error('http ' + r.status);
-  return await r.text();
+  // 腾讯行情接口为 GBK 编码，需显式解码
+  const buf = await r.arrayBuffer();
+  try { return new TextDecoder('gbk').decode(buf); }
+  catch (e) { return new TextDecoder('utf-8').decode(buf); }
 }
 async function fetchJSON(url) {
-  const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  const r = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Referer': 'https://quote.eastmoney.com/',
+      'Accept': '*/*'
+    }
+  });
   if (!r.ok) throw new Error('http ' + r.status);
   return await r.json();
 }
