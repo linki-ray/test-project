@@ -119,30 +119,68 @@ App.pages['viral-videos'] = function (root) {
   liveCard.appendChild(liveBox);
   root.appendChild(liveCard);
 
-  /* ===================== 视频智能解析（宠物向） ===================== */
+  /* ===================== 视频智能解析（猫咪账号专属） ===================== */
   var analyzerCard = U.el('div', { class: 'card' });
-  analyzerCard.appendChild(U.el('div', { class: 'card-title', html: '🎬 视频智能解析 <span class="src-tag">宠物向 · 粘贴链接+标题/口播自动拆解</span>' }));
-  analyzerCard.appendChild(U.el('div', { class: 'muted', style: 'margin-bottom:10px', text: '说明：纯前端无法直接抓取抖音/小红书视频内部数据（平台反爬+跨域限制）。请粘贴视频链接（记录来源），并填写你看到的标题与口播/描述文案，点「解析视频」即可自动拆解选题、标题钩子、文案脚本、视频框架、拍摄手法，并输出可直接拍的可借鉴文案。' }));
+  analyzerCard.appendChild(U.el('div', { class: 'card-title', html: '🎬 视频智能解析 <span class="src-tag">猫咪账号专属 · 发链接一键解析</span>' }));
+  analyzerCard.appendChild(U.el('div', { class: 'muted', style: 'margin-bottom:10px', text: '粘贴抖音/小红书视频链接，点「一键解析」自动提取标题与文案，并为你（猫咪账号）重新生成可拍脚本。若平台限制自动抓取，会提示你手动补充、或把链接发我（在对话里）帮你深度解析。' }));
   var aRow = U.el('div', { class: 'row wrap' });
-  var aLink = U.el('input', { class: 'input', placeholder: '视频链接（抖音/小红书，可选）', style: 'flex:1;min-width:180px' });
-  var aTitle = U.el('input', { class: 'input', placeholder: '视频标题（必填，拆解主要依据）', style: 'flex:1;min-width:180px' });
-  aRow.appendChild(aLink); aRow.appendChild(aTitle);
+  var aLink = U.el('input', { class: 'input', placeholder: '粘贴视频链接（抖音/小红书）', style: 'flex:1;min-width:220px' });
+  aRow.appendChild(aLink);
   analyzerCard.appendChild(aRow);
-  var aDesc = U.el('textarea', { class: 'textarea', placeholder: '口播文案 / 视频描述（越详细，拆解与生成文案越准）。可粘贴你记下的台词、字幕或笔记。', style: 'margin-top:8px' });
-  analyzerCard.appendChild(aDesc);
+  // 手动补充（默认隐藏，自动抓取失败或用户主动展开时显示）
+  var aManual = U.el('div', { style: 'display:none;margin-top:8px' });
+  var aTitle = U.el('input', { class: 'input', placeholder: '视频标题（自动获取失败时可手动填）', style: 'width:100%;margin-bottom:6px' });
+  var aDesc = U.el('textarea', { class: 'textarea', placeholder: '口播文案 / 视频描述（自动获取失败时可手动粘贴你看到的台词/字幕）', style: 'width:100%' });
+  aManual.appendChild(aTitle); aManual.appendChild(aDesc);
+  analyzerCard.appendChild(aManual);
   var aRow2 = U.el('div', { class: 'row', style: 'margin-top:8px' });
-  aRow2.appendChild(U.el('button', { class: 'btn', text: '🔍 解析视频', onclick: runAnalyze }));
-  aRow2.appendChild(U.el('button', { class: 'btn ghost', text: '一键打开原视频', onclick: function () { if (aLink.value.trim()) window.open(aLink.value.trim(), '_blank'); else U.toast('请先填写视频链接'); } }));
+  aRow2.appendChild(U.el('button', { class: 'btn', id: 'vvParseBtn', text: '🔍 一键解析', onclick: runAnalyze }));
+  aRow2.appendChild(U.el('button', { class: 'btn ghost', text: '手动补充', onclick: function () { aManual.style.display = 'block'; aTitle.focus(); } }));
+  aRow2.appendChild(U.el('button', { class: 'btn ghost', text: '打开原视频', onclick: function () { if (aLink.value.trim()) window.open(aLink.value.trim(), '_blank'); else U.toast('请先填写视频链接'); } }));
   analyzerCard.appendChild(aRow2);
+  var aStatus = U.el('div', { class: 'muted', id: 'vvParseStatus', style: 'margin-top:6px' });
+  analyzerCard.appendChild(aStatus);
   var aResult = U.el('div', { id: 'vvAnalyzeResult' });
   analyzerCard.appendChild(aResult);
   root.appendChild(analyzerCard);
 
   function runAnalyze() {
+    var link = aLink.value.trim();
     var title = aTitle.value.trim();
+    var desc = aDesc.value.trim();
+    if (!link && !title) { U.toast('请粘贴视频链接，或展开「手动补充」填标题'); aLink.focus(); return; }
+    U.$('#vvParseStatus').textContent = '解析中…';
+    U.$('#vvParseBtn').disabled = true;
+    if (link) {
+      fetchVideoMeta(link).then(function (meta) {
+        if (meta && meta.ok) {
+          if (!title) { title = meta.title || ''; aTitle.value = title; }
+          if (!desc) { desc = meta.desc || ''; aDesc.value = desc; }
+          U.$('#vvParseStatus').textContent = '✅ 已自动提取标题/文案';
+          finishAnalyze(link, title, desc);
+        } else {
+          U.$('#vvParseStatus').innerHTML = '⚠️ 平台限制自动抓取（' + ((meta && meta.reason) || '未知') + '）。请展开「手动补充」粘贴标题/口播，或把链接发我（在对话里）帮你深度解析。';
+          aManual.style.display = 'block';
+          if (!title) aTitle.focus(); else finishAnalyze(link, title, desc);
+        }
+      }).catch(function () {
+        U.$('#vvParseStatus').textContent = '⚠️ 解析异常，请手动补充或把链接发我（对话里）';
+        aManual.style.display = 'block';
+      });
+    } else {
+      finishAnalyze(link, title, desc);
+    }
+  }
+  function fetchVideoMeta(link) {
+    var base = (window.APP_CONFIG && window.APP_CONFIG.FETCH_VIDEO_API) || '/api/fetch-video';
+    return fetch(base + '?url=' + encodeURIComponent(link), { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .catch(function () { return { ok: false, reason: '网络/接口不可用' }; });
+  }
+  function finishAnalyze(link, title, desc) {
+    U.$('#vvParseBtn').disabled = false;
     if (!title) { U.toast('请填写视频标题'); aTitle.focus(); return; }
-    var input = { link: aLink.value.trim(), title: title, desc: aDesc.value.trim() };
-    renderAnalysis(parseVideo(input), input);
+    renderAnalysis(parseVideo({ link: link, title: title, desc: desc }), { link: link, title: title, desc: desc });
   }
 
   function loadLive() {
@@ -385,7 +423,7 @@ App.pages['viral-videos'] = function (root) {
     var raw = (input.title + ' ' + (input.desc || '')).toLowerCase();
     var desc = input.desc || '';
 
-    // 1. 赛道识别
+    // 1. 原视频赛道识别（参考）
     var trackRules = [
       { keys: ['剧情', '反转', '报恩', '故事', '情感', '泪目', '感动', '救助'], t: '宠物剧情' },
       { keys: ['科普', '为什么', '为何', '原理', '知识', '误区', '涨知识', '怎么', '如何'], t: '宠物科普' },
@@ -398,7 +436,7 @@ App.pages['viral-videos'] = function (root) {
     var track = '萌宠日常';
     for (var i = 0; i < trackRules.length; i++) { if (trackRules[i].keys.some(function (k) { return raw.indexOf(k) > -1; })) { track = trackRules[i].t; break; } }
 
-    // 2. 开头钩子识别
+    // 2. 原视频开头钩子识别
     var hookRules = [
       { re: /第一次|首次|头一回/, h: '"第一次…名场面"反差钩子' },
       { re: /谁懂|懂的|破防/, h: '"谁懂啊"情绪共鸣钩子' },
@@ -411,7 +449,7 @@ App.pages['viral-videos'] = function (root) {
     var hook = '开篇直给强冲击钩子';
     for (var h = 0; h < hookRules.length; h++) { if (hookRules[h].re.test(raw)) { hook = hookRules[h].h; break; } }
 
-    // 3. 情绪识别
+    // 3. 原视频情绪识别
     var emoRules = [
       { keys: ['治愈', '解压', '放松', '舒服'], e: '治愈解压' },
       { keys: ['笑死', '搞笑', '名场面', '翻车', '沙雕'], e: '搞笑娱乐' },
@@ -423,14 +461,13 @@ App.pages['viral-videos'] = function (root) {
     var emotion = '治愈陪伴';
     for (var e = 0; e < emoRules.length; e++) { if (emoRules[e].keys.some(function (k) { return raw.indexOf(k) > -1; })) { emotion = emoRules[e].e; break; } }
 
-    // 4. 反转 / 视觉 / 文案 / BGM / 标签
+    // 4. 原视频反转 / 视觉 / 文案 / BGM / 标签（参考）
     var twist = (raw.indexOf('反转') > -1) ? '结尾神反转' : (emotion === '温情共鸣' ? '铺垫→温情反转' : '自然递进收尾');
     var visual = track === '萌宠穿搭' ? '全身镜多角度+同款特写' : track === '宠物好物' ? '产品摆拍+成分对比' : track === '宠物科普' ? '实拍+字幕讲解' : track === '宠物剧情' ? '固定机位+运镜跟随' : '近距离特写+慢动作抓拍';
-    var copy = '用你自家宠物的真实反应做主角，比摆拍更打动人';
     var bgm = emotion === '搞笑娱乐' ? '搞笑音效/卡点BGM' : emotion === '治愈解压' ? '治愈系纯音乐' : emotion === '种草带货' ? '科技感/轻快' : '悬疑转场→温情';
     var tag = '#' + track + ' #萌宠日常 #宠物' + (emotion === '种草带货' ? ' #宠物好物' : '');
 
-    // 5. 分镜框架（按赛道）
+    // 5. 原视频分镜框架（参考）
     var frameworkMap = {
       '宠物剧情': [{ t: '0-3s', c: '悬念开头：它（等待/守护）的画面' }, { t: '3-15s', c: '铺垫：起因（捡到/生病/走丢）' }, { t: '15-40s', c: '过程：照顾/陪伴真实记录' }, { t: '40-55s', c: '反转：温情爆点（报恩/康复/认家）' }, { t: '55-60s', c: '结尾：升华+引导关注' }],
       '宠物科普': [{ t: '0-3s', c: '痛点钩子：你家猫也__？' }, { t: '3-20s', c: '原理：字幕+实拍讲清楚' }, { t: '20-45s', c: '举例：具体表现与应对' }, { t: '45-60s', c: '养宠建议+收藏引导' }],
@@ -442,28 +479,54 @@ App.pages['viral-videos'] = function (root) {
     };
     var framework = frameworkMap[track] || [{ t: '0-3s', c: '强冲击钩子开场' }, { t: '3-40s', c: '真实记录主体内容' }, { t: '40-60s', c: '情绪收尾+引导' }];
 
-    // 6. 口播脚本
-    var anchor = desc ? ('就像你记下的：「' + desc.slice(0, 30) + (desc.length > 30 ? '…' : '') + '」') : ('用' + track + '的真实画面抓眼球');
-    var script = '【开场】' + hook.replace(/"/g, '') + '——' + anchor + '。\n【正文】围绕「' + emotion + '」展开：先抛' + (track === '宠物好物' ? '痛点与横评' : '真实反应/过程') + '，再用' + visual + '把' + emotion + '情绪拉满。\n【结尾】给观众一个行动指令：点赞收藏，下期教你__。';
+    // ===== 给你的猫咪账号：选题 + 重新生成脚本（猫咪专属）=====
+    var catTopicMap = {
+      '宠物剧情': '猫咪报恩/守护/走丢被找回的温情剧情——用你自家猫的真实瞬间拍',
+      '宠物科普': '猫咪冷知识/养猫误区（如：猫为什么半夜跑酷、为什么踩奶）',
+      '宠物好物': '平价猫粮/猫砂/猫玩具红黑榜实测（出镜主角换成你家猫）',
+      '萌宠穿搭': '猫咪秋冬毛衣/项圈穿搭（注意猫咪接受度，别强制）',
+      '猫咪': '猫咪反差萌反应名场面（第一次吃__、第一次洗澡）',
+      '狗狗': '把"狗狗"套路换成"猫咪"：同类行为怎么拍更萌',
+      '异宠': '换主角：用猫咪演绎同类治愈/种草剧情',
+      '萌宠日常': '猫咪一天 vlog（清晨醒神 / 午后晒太阳 / 夜晚跑酷）'
+    };
+    var catTopic = catTopicMap[track] || '猫咪日常反差萌记录（沿用原视频结构，主角换成你家猫）';
 
-    // 7. 标题备选
-    var titles = [
-      (title.length > 16 ? title.slice(0, 16) + '…' : title),
-      hook.replace(/"/g, '') + '，' + emotion + ' #' + track,
-      '建议拍同款：' + (track === '宠物好物' ? '平价__实测红黑榜' : track === '宠物剧情' ? '我家毛孩子报恩瞬间' : track === '宠物科普' ? '养宠人必看的__误区' : track === '萌宠穿搭' ? '__穿搭公式抄作业' : track + '日常真实记录'),
-      '没想到' + track + '还能这样拍｜' + emotion
+    var catFramework = [
+      { t: '0-3s', c: '钩子：镜头怼猫咪脸，抓它最魔性的表情/动作特写' },
+      { t: '3-15s', c: '铺垫：交代情境（新玩具 / 新食物 / 新家 / 新成员）' },
+      { t: '15-40s', c: '主体：真实记录你家猫的反应，抓拍不强迫、不摆拍' },
+      { t: '40-55s', c: '高潮：最萌 / 最搞笑 / 最温情的瞬间' },
+      { t: '55-60s', c: '结尾：互动引导「喜欢小猫咪点个赞关注我～」' }
     ];
 
-    // 8. 可借鉴的可执行文案
-    var body = (track === '宠物好物' ? '先说坑再上平价好物，边用边讲' : track === '宠物剧情' ? '从铺垫到温情反转，真实记录不摆拍' : track === '宠物科普' ? '现象→原理→建议，字幕辅助' : track === '萌宠穿搭' ? '搭配公式+同款多角度' : (track === '猫咪' || track === '狗狗' || track === '异宠') ? '抓拍宠物最自然的反应，不强迫' : '记录最真实的日常片段');
-    var actionable = '📋 你可以直接拍的同款脚本：\n\n' +
-      '【0-3s 黄金开头】' + hook.replace(/"/g, '') + '，画面直接给' + visual + '的特写，前3秒不留废话。\n' +
-      '【3-40s 内容主体】用' + emotion + '情绪线串起来：' + body + '。\n' +
-      '【40-60s 结尾】' + twist + '，加一句口播："喜欢我家毛孩子记得点赞关注～"\n\n' +
-      '【拍摄清单】' + visual + '；BGM 用' + bgm + '；发布带 ' + tag + '。\n' +
-      '【核心提醒】真实 > 摆拍，用你自家宠物做主角，复制爆款结构而非抄袭内容。';
+    // ③ 重新生成脚本（猫咪账号 · 口播稿）
+    var script = '【开场 0-3s】反差钩子：镜头直接怼猫咪脸，抓它最魔性的表情/动作，配一句"没想到我家猫居然__"。\n'
+      + '【正文 3-40s】围绕「' + emotion + '」情绪线展开：真实记录你家猫的__反应，用' + visual + '的拍法把情绪拉满；不摆拍、不强迫，等它自然流露最打动人。\n'
+      + '【结尾 40-60s】' + twist + '，口播收尾："喜欢这只小猫咪，记得点赞关注我呀～"';
 
-    return { track: track, hook: hook, emotion: emotion, twist: twist, visual: visual, copy: copy, bgm: bgm, tag: tag, framework: framework, script: script, titles: titles, actionable: actionable };
+    // 猫咪向标题备选
+    var titles = [
+      '我家猫第一次__的反应，笑不活了🐱',
+      '养猫人才懂的__瞬间｜治愈日常',
+      '没想到猫咪还能这样__｜建议收藏',
+      hook.replace(/"/g, '') + '，猫咪版也太萌了'
+    ];
+
+    // ④ 可借鉴的「我能做的视频文案」+ 拍摄清单（猫咪专属）
+    var body = (track === '宠物好物' ? '先说坑再上你家猫在用的平价好物，边用边讲' : track === '宠物剧情' ? '从铺垫到温情反转，用你家猫的真实瞬间' : track === '宠物科普' ? '现象→原理→建议，字幕辅助' : track === '萌宠穿搭' ? '搭配公式+同款多角度' : '真实记录你家猫的__反应，抓最自然的瞬间');
+    var actionable = '🐱 你的猫咪账号可直接拍的同款脚本：\n\n'
+      + '【0-3s 黄金开头】' + hook.replace(/"/g, '') + '——画面直接放猫咪最萌的表情/动作特写，前3秒不留废话。\n'
+      + '【3-40s 内容主体】用「' + emotion + '」情绪串起来：' + body + '。\n'
+      + '【40-60s 结尾】' + twist + '，加口播"喜欢小猫咪记得点赞关注～"\n\n'
+      + '【拍摄清单】' + visual + '；BGM 用' + bgm + '；发布带 ' + '#猫咪 #萌宠日常 #' + emotion + '。\n'
+      + '【核心提醒】真实 > 摆拍，用你自家猫做主角，复制爆款的"结构"而非"内容"。';
+
+    return {
+      track: track, hook: hook, emotion: emotion, twist: twist, visual: visual, bgm: bgm, tag: tag,
+      framework: framework, catTopic: catTopic, catFramework: catFramework,
+      script: script, titles: titles, actionable: actionable
+    };
   }
 
   function kvBlock(title, pairs) {
@@ -487,14 +550,25 @@ App.pages['viral-videos'] = function (root) {
   function renderAnalysis(p, input) {
     U.clear(aResult);
     var card = U.el('div', { class: 'card', style: 'margin-top:12px;background:var(--surface-2)' });
-    card.appendChild(U.el('div', { class: 'card-title', html: '🔍 解析结果 · <span class="tag">' + p.track + '</span> <span class="tag">' + p.emotion + '</span>' }));
+    card.appendChild(U.el('div', { class: 'card-title', html: '🔍 解析结果 · <span class="tag">猫咪账号专属</span> <span class="tag">' + p.emotion + '</span>' }));
 
-    card.appendChild(kvBlock('选题定位', [['赛道', p.track], ['情绪标签', p.emotion], ['话题标签', p.tag]]));
-    card.appendChild(kvBlock('标题 / 钩子拆解', [['开头钩子', p.hook], ['反转设计', p.twist], ['视觉画面', p.visual], ['文案要点', p.copy], ['BGM', p.bgm]]));
+    // ① 标题 / 口播文案（原视频）
+    card.appendChild(kvBlock('① 标题 / 口播文案（原视频）', [
+      ['标题', input.title || '—'],
+      ['口播文案（来源）', input.desc || '（未自动获取，可展开「手动补充」粘贴你看到的台词/字幕）']
+    ]));
 
+    // ② 选题（给你的猫咪账号）
+    card.appendChild(kvBlock('② 选题 · 给你的猫咪账号', [
+      ['可拍选题', p.catTopic],
+      ['原视频参考', '赛道：' + p.track + ' ｜ 情绪：' + p.emotion]
+    ]));
+
+    // ③ 重新生成脚本（猫咪账号 · 口播稿）
+    card.appendChild(txtBlock('③ 重新生成脚本（猫咪账号专属 · 口播稿）', p.script));
     var fw = U.el('div', { class: 'card', style: 'margin-bottom:0;background:var(--surface)' });
-    fw.appendChild(U.el('div', { class: 'card-title', style: 'font-size:14px;margin-bottom:8px', text: '视频框架（分镜脚本）' }));
-    p.framework.forEach(function (s) {
+    fw.appendChild(U.el('div', { class: 'card-title', style: 'font-size:14px;margin-bottom:8px', text: '分镜框架（猫咪账号）' }));
+    p.catFramework.forEach(function (s) {
       fw.appendChild(U.el('div', { style: 'margin-bottom:6px' }, [
         U.el('span', { style: 'color:var(--brand);font-weight:600;font-size:13px', text: s.t + '：' }),
         U.el('span', { style: 'font-size:13px', text: s.c })
@@ -502,18 +576,21 @@ App.pages['viral-videos'] = function (root) {
     });
     card.appendChild(fw);
 
-    card.appendChild(txtBlock('文案脚本（口播稿）', p.script));
-
-    var tt = U.el('div', { class: 'card', style: 'margin-bottom:0;background:var(--surface)' });
-    tt.appendChild(U.el('div', { class: 'card-title', style: 'font-size:14px;margin-bottom:8px', text: '标题备选' }));
-    p.titles.forEach(function (t) { tt.appendChild(U.el('div', { style: 'font-size:13px;margin-bottom:4px', text: '· ' + t })); });
-    card.appendChild(tt);
-
+    // ④ 可借鉴文案 + 拍摄清单
     var ac = U.el('div', { class: 'card', style: 'margin-bottom:0;background:var(--surface)' });
-    ac.appendChild(U.el('div', { class: 'card-title', style: 'font-size:14px;margin-bottom:8px', text: '✨ 可借鉴的「我能做的视频文案」' }));
+    ac.appendChild(U.el('div', { class: 'card-title', style: 'font-size:14px;margin-bottom:8px', text: '④ 可借鉴文案 + 拍摄清单' }));
     ac.appendChild(U.el('div', { style: 'font-size:13px;white-space:pre-wrap;line-height:1.6', text: p.actionable }));
     ac.appendChild(U.el('button', { class: 'btn ghost sm', style: 'margin-top:8px', text: '📋 复制可借鉴文案', onclick: function () { copyText(p.actionable); U.toast('已复制到剪贴板'); } }));
     card.appendChild(ac);
+
+    // 原视频爆火拆解（参考，放后面）
+    card.appendChild(kvBlock('原视频爆火拆解（参考）', [['开头钩子', p.hook], ['反转设计', p.twist], ['视觉画面', p.visual], ['BGM', p.bgm], ['话题标签', p.tag]]));
+
+    // 猫咪向标题备选
+    var tt = U.el('div', { class: 'card', style: 'margin-bottom:0;background:var(--surface)' });
+    tt.appendChild(U.el('div', { class: 'card-title', style: 'font-size:14px;margin-bottom:8px', text: '猫咪向标题备选' }));
+    p.titles.forEach(function (t) { tt.appendChild(U.el('div', { style: 'font-size:13px;margin-bottom:4px', text: '· ' + t })); });
+    card.appendChild(tt);
 
     card.appendChild(U.el('button', { class: 'btn sm', style: 'margin-top:10px', text: '💾 保存为爆款素材', onclick: function () { saveParsedAsMaterial(p, input); } }));
     aResult.appendChild(card);

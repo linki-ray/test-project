@@ -29,8 +29,12 @@ App.pages = App.pages || {};
       price: parseFloat(p[3]) || 0, prevClose: parseFloat(p[4]) || 0, open: parseFloat(p[5]) || 0,
       chg: parseFloat(p[31]) || 0, chgPct: parseFloat(p[32]) || 0,
       high: parseFloat(p[33]) || 0, low: parseFloat(p[34]) || 0,
-      turnover: parseFloat(p[37]) || 0, pe: parseFloat(p[38]) || 0,
-      amount: amount, volumeRatio: parseFloat(p[46]) || 0,
+      // 经东方财富权威值交叉校验（2026-07-30）：
+      //   换手率 = p[38]（茅台 0.57% 与「成交量÷流通股」手算吻合）
+      //   量比   = p[43]（茅台 3.03 与东财 f171=303 吻合；工行/宁德同样吻合）
+      //   PE     = p[39]；总市值 = p[44]（亿元）；成交额字符串在 p[35]
+      turnover: parseFloat(p[38]) || 0, pe: parseFloat(p[39]) || 0,
+      amount: amount, volumeRatio: parseFloat(p[43]) || 0,
       mv: parseFloat(p[44]) ? parseFloat(p[44]) * 1e8 : 0
     };
   }
