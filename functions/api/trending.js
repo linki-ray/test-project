@@ -54,7 +54,8 @@ async function fetchOne(url) {
 }
 
 export async function onRequestGet(context) {
-  const type = (context.request.query.get('type') || 'douyin').toLowerCase();
+  const url = new URL(context.request.url);
+  const type = (url.searchParams.get('type') || 'douyin').toLowerCase();
   const sources = SOURCES[type] || SOURCES.douyin;
   let lastErr = '';
   for (const url of sources) {
