@@ -7,20 +7,45 @@
  */
 const SOURCES = {
   douyin: [
-    'https://api.pearktrue.cn/api/douyinhot/',
-    'https://api.oioweb.cn/api/common/HotList?type=douyin'
+    'https://uapis.cn/api/v1/misc/hotboard?type=douyin',
+    'https://60s.viki.moe/v2/douyin'
   ],
   weibo: [
-    'https://api.oioweb.cn/api/common/HotList?type=weibo',
-    'https://tenapi.cn/v2/weibohot',
-    'https://api.vvhan.com/api/hotlist/wbHot'
+    'https://uapis.cn/api/v1/misc/hotboard?type=weibo',
+    'https://60s.viki.moe/v2/weibo'
   ],
-  zhihu: ['https://api.oioweb.cn/api/common/HotList?type=zhihu'],
-  baidu: ['https://api.oioweb.cn/api/common/HotList?type=baidu']
+  zhihu: [
+    'https://uapis.cn/api/v1/misc/hotboard?type=zhihu',
+    'https://60s.viki.moe/v2/zhihu'
+  ],
+  baidu: [
+    'https://uapis.cn/api/v1/misc/hotboard?type=baidu',
+    'https://60s.viki.moe/v2/baidu'
+  ]
 };
 
 function normalize(j) {
   if (!j || typeof j !== 'object') return [];
+
+  // 1) uapis.cn: { type, update_time, list: [{index, title, url, hot_value}] }
+  if (j.list && Array.isArray(j.list)) {
+    return j.list.map((x) => ({
+      title: String(x.title || ''),
+      hot: Number(x.hot_value || x.hot || 0),
+      url: x.url || ''
+    })).filter((x) => x.title);
+  }
+
+  // 2) 60s.viki.moe: { code: 200, data: [{title, hot_value, link}] }
+  if (j.code === 200 && j.data && Array.isArray(j.data)) {
+    return j.data.map((x) => ({
+      title: String(x.title || ''),
+      hot: Number(x.hot_value || x.hot || 0),
+      url: x.link || x.url || ''
+    })).filter((x) => x.title);
+  }
+
+  // 3) 旧格式兜底
   let list = j;
   if (j.items && Array.isArray(j.items)) return j.items;
   if (j.data) list = j.data;
@@ -32,7 +57,7 @@ function normalize(j) {
     if (x && typeof x === 'object' && (x.title || x.word || x.name || x.query)) {
       return {
         title: String(x.title || x.word || x.name || x.query || ''),
-        hot: Number(x.hot || x.num || x.score || x.heat || 0),
+        hot: Number(x.hot || x.num || x.score || x.heat || x.hot_value || 0),
         url: x.url || x.mblink || x.link || x.mobileUrl || ''
       };
     }

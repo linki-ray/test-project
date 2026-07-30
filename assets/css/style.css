@@ -323,16 +323,25 @@ body {
 @media (max-width: 760px) {
   :root { --nav-w: var(--nav-w-mobile); }
   #nav {
-    left: 10px; top: 10px; bottom: 10px; padding: 16px 7px;
+    left: 10px; top: 10px; bottom: 10px; padding: 14px 6px;
     align-items: center; border-radius: 22px; gap: 8px;
     box-shadow: 0 14px 40px rgba(31,36,48,.12);
   }
-  .brand-text, .nav-item span, .nav-settings span { display: none; }
-  .nav-item { justify-content: center; padding: 12px 0; }
-  .nav-item .nav-ico-wrap { width: 44px; height: 44px; border-radius: 14px; }
-  .nav-brand { justify-content: center; padding: 2px 0 14px; }
-  .nav-settings { justify-content: center; }
-  #content { margin-left: calc(var(--nav-w) + 20px); }
+  .brand-text { display: none; }
+  .nav-item {
+    flex-direction: column; gap: 4px;
+    justify-content: center; padding: 9px 2px;
+    font-size: 11px; text-align: center;
+  }
+  .nav-item .nav-ico-wrap { width: 36px; height: 36px; border-radius: 12px; }
+  .nav-item .nav-ico { width: 18px; height: 18px; }
+  .nav-brand { justify-content: center; padding: 2px 0 10px; }
+  .nav-settings {
+    flex-direction: column; gap: 3px;
+    justify-content: center; font-size: 10px; padding: 10px 2px;
+  }
+  .nav-settings .nav-ico { width: 18px; height: 18px; }
+  #content { margin-left: calc(var(--nav-w) + 18px); }
   .page-root { padding: 6px 14px 32px; }
   #topbar { padding: 14px 14px 6px; }
   #pageTitle { font-size: 19px; }
@@ -340,11 +349,13 @@ body {
 }
 
 @media (max-width: 420px) {
-  :root { --nav-w: 60px; }
-  #nav { left: 8px; top: 8px; bottom: 8px; padding: 14px 5px; border-radius: 18px; }
-  .nav-item { padding: 11px 0; }
-  .nav-item .nav-ico-wrap { width: 40px; height: 40px; }
-  #content { margin-left: calc(var(--nav-w) + 16px); }
+  :root { --nav-w: 78px; --nav-w-mobile: 78px; }
+  #nav { left: 8px; top: 8px; bottom: 8px; padding: 12px 4px; border-radius: 18px; }
+  .nav-item { padding: 8px 1px; font-size: 10px; }
+  .nav-item .nav-ico-wrap { width: 32px; height: 32px; border-radius: 10px; }
+  .nav-item .nav-ico { width: 16px; height: 16px; }
+  .nav-settings { font-size: 9px; padding: 8px 1px; }
+  #content { margin-left: calc(var(--nav-w) + 14px); }
   .page-root { padding: 4px 12px 28px; }
 }
 
