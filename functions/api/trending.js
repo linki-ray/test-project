@@ -7,6 +7,9 @@
  */
 const SOURCES = {
   douyin: [
+    'https://api.vvhan.com/api/hotlist/douyin',
+    'https://api-hot.imsyy.top/douyin',
+    'https://api.pearktrue.cn/api/douyinhot/',
     'https://uapis.cn/api/v1/misc/hotboard?type=douyin',
     'https://60s.viki.moe/v2/douyin'
   ],

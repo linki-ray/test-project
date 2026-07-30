@@ -13,5 +13,8 @@ window.APP_CONFIG = {
   SUPABASE_ANON_KEY: 'sb_publishable_p_-STPaJnFGnkPfTjl_tBA_yp8xYKP_',
   // 联网热榜接口：由 Cloudflare Pages 服务端函数 /api/trending 提供真实数据。
   // 使用完整地址，保证 github.io / 本地调试 / PWA 桌面模式都能调用。
-  TRENDING_API: 'https://test-project-ek2.pages.dev/api/trending'
+  TRENDING_API: 'https://test-project-ek2.pages.dev/api/trending',
+  // 金融数据接口：由 Cloudflare Pages 服务端函数 /api/finance 代理（绕开浏览器跨域），
+  // 大盘/个股行情走腾讯自选股，板块/K线走东方财富，均为真实联网数据。
+  FINANCE_API: 'https://test-project-ek2.pages.dev/api/finance'
 };

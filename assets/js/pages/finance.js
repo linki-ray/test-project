@@ -13,6 +13,13 @@ App.pages = App.pages || {};
 (function () {
   var U = App.U, S = App.Store;
 
+  /* ---------- 金融数据代理（服务端 /api/finance，绕开浏览器跨域 CORS） ---------- */
+  function fetchFinance(params) {
+    var base = (window.APP_CONFIG && window.APP_CONFIG.FINANCE_API) || '/api/finance';
+    var qs = Object.keys(params).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); }).join('&');
+    return U.fetchJSON(base + '?' + qs, 12000);
+  }
+
   /* ---------- 工具：东方财富 secid ---------- */
   function toSecid(code) {
     code = String(code).toLowerCase();
@@ -239,20 +246,26 @@ App.pages = App.pages || {};
     // 拉取数据（联网实时）
     function loadIndices(manual) {
       if (manual) U.$('#idxSrc').innerHTML = '<span class="live-dot wait"></span> 刷新中…';
-      var secids = '1.000001,0.399001,0.399006,1.000688';
-      emJSON('https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&secids=' + secids + '&fields=f12,f13,f14,f43,f168,f169,f170,f116')
+      fetchFinance({ type: 'indices' })
         .then(function (j) {
-          var list = (j.data && j.data.diff || []).map(function (d) { return { code: d.f12, name: d.f14, price: d.f43, chgPct: d.f168, chg: d.f169 }; });
-          U.$('#idxSrc').innerHTML = '<span class="live-dot on"></span> 实时'; showIdx(list); saveSnap('indices', list);
-        }).catch(function () { U.$('#idxSrc').innerHTML = '<span class="live-dot off"></span> 示例'; showIdx(DEMO_INDICES); saveSnap('indices', DEMO_INDICES); });
+          if (!j || !j.ok || !j.items || !j.items.length) throw new Error('empty');
+          showIdx(j.items); saveSnap('indices', j.items);
+          U.$('#idxSrc').innerHTML = '<span class="live-dot on"></span> 实时';
+        }).catch(function () {
+          U.$('#idxSrc').innerHTML = '<span class="live-dot off"></span> 获取失败';
+          if (!manual) U.toast('大盘数据获取失败，请检查网络或稍后重试');
+        });
     }
     function loadSectors(manual) {
       if (manual) U.$('#secSrc').innerHTML = '<span class="live-dot wait"></span> 刷新中…';
-      emJSON('https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=12&po=1&fid=f3&fs=m:90+t:2&fields=f12,f14,f3')
+      fetchFinance({ type: 'sectors' })
         .then(function (j) {
-          var list = (j.data && j.data.diff || []).map(function (d) { return { code: d.f12, name: d.f14, chgPct: d.f3 }; });
-          U.$('#secSrc').innerHTML = '<span class="live-dot on"></span> 实时'; showSectors(list); saveSnap('sectors', list);
-        }).catch(function () { U.$('#secSrc').innerHTML = '<span class="live-dot off"></span> 示例'; showSectors(DEMO_SECTORS); saveSnap('sectors', DEMO_SECTORS); });
+          if (!j || !j.ok || !j.items || !j.items.length) throw new Error('empty');
+          showSectors(j.items); saveSnap('sectors', j.items);
+          U.$('#secSrc').innerHTML = '<span class="live-dot on"></span> 实时';
+        }).catch(function () {
+          U.$('#secSrc').innerHTML = '<span class="live-dot off"></span> 获取失败';
+        });
     }
     loadIndices(); loadSectors();
     // 资讯（示例，标注清晰）
@@ -304,12 +317,22 @@ App.pages = App.pages || {};
 
     function analyze(code) {
       code = String(code).replace(/^(sh|sz)/i, '');
-      var secid = toSecid(code);
-      if (!secid) { U.toast('代码格式不正确'); return; }
       U.clear(reportBox); reportBox.appendChild(U.el('div', { class: 'empty', text: '加载行情与分析中…' }));
-      Promise.all([fetchQuote(secid), fetchKline(secid, 101, 120), fetchKline(secid, 102, 60)])
-        .then(function (res) { buildReport(res[0], res[1], res[2], code); saveHist(code, res[0].name); })
-        .catch(function () { reportBox.innerHTML = ''; reportBox.appendChild(U.el('div', { class: 'empty', text: '行情接口暂不可用，请稍后重试（需联网）' })); });
+      Promise.all([
+        fetchFinance({ type: 'quote', code: code }),
+        fetchFinance({ type: 'kline', code: code, klt: 101, lmt: 120 }),
+        fetchFinance({ type: 'kline', code: code, klt: 102, lmt: 60 })
+      ]).then(function (res) {
+        var qj = res[0], dj = res[1], wj = res[2];
+        if (!qj || !qj.ok || !qj.item) throw new Error('quote failed');
+        var q = qj.item;
+        var daily = (dj && dj.items) || [];
+        var weekly = (wj && wj.items) || [];
+        if (!daily.length) throw new Error('kline failed');
+        buildReport(q, daily, weekly, code); saveHist(code, q.name);
+      }).catch(function () {
+        reportBox.innerHTML = ''; reportBox.appendChild(U.el('div', { class: 'empty', text: '行情接口暂不可用，请稍后重试（需联网）' }));
+      });
     }
 
     function buildReport(q, daily, weekly, code) {
