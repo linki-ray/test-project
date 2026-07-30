@@ -11,7 +11,8 @@ App.Sync = (function () {
   var CFG = window.APP_CONFIG || {};
   var URL = (CFG.SUPABASE_URL || '').replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
   var KEY = CFG.SUPABASE_ANON_KEY || '';
-  var ENABLED = !!(URL && KEY);
+  // 总开关：仅在配置显式开启且已填密钥时才启用云端同步
+  var ENABLED = (CFG.CLOUD_SYNC_ENABLED !== false) && !!(URL && KEY);
 
   var SESSION_KEY = 'ws_sync_session';
   var session = null;

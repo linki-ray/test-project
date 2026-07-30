@@ -203,14 +203,18 @@
     U.$('#loginPwd').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
     U.$('#loginEmail').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
   }
-  U.$('#accountBtn').addEventListener('click', function () {
-    if (!App.Sync || !App.Sync.ENABLED) { U.toast('未配置云端同步'); return; }
-    if (App.Sync.isLoggedIn()) {
-      if (window.confirm('退出当前账号？本地数据保留，云端同步将暂停。')) {
-        App.Sync.logout(); updateSyncPill('offline'); U.toast('已退出登录');
-      }
-    } else { showLogin(true); }
-  });
+  // 账号按钮（仅云端同步开启时存在）；纯本地模式已移除，这里做存在性守卫
+  var accountBtn = U.$('#accountBtn');
+  if (accountBtn) {
+    accountBtn.addEventListener('click', function () {
+      if (!App.Sync || !App.Sync.ENABLED) { U.toast('未配置云端同步'); return; }
+      if (App.Sync.isLoggedIn()) {
+        if (window.confirm('退出当前账号？本地数据保留，云端同步将暂停。')) {
+          App.Sync.logout(); updateSyncPill('offline'); U.toast('已退出登录');
+        }
+      } else { showLogin(true); }
+    });
+  }
 
   // 首次交互申请通知权限
   document.addEventListener('click', function once() {

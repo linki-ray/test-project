@@ -1,11 +1,14 @@
 /* =========================================================
-   云端同步配置（Supabase）
-   - 已填入真实配置，跨设备同步已开启；
-   - 若两项留空，自动退回「纯本地模式」（功能照常，不跨设备）。
-   - publishable / anon key 本就设计为可公开，放前端安全，
-     真正的数据隔离由 Supabase 的 RLS 规则（auth.uid() = user_id）保证。
+   应用配置
+   - CLOUD_SYNC_ENABLED: 是否启用云端同步（跨设备）。
+       false = 纯本地模式，打开即用、无需登录，数据仅存当前设备浏览器。
+       true  = 启用 Supabase 跨设备同步（需登录）。
+   - 当前为纯本地模式，已将登录页彻底移除。
    ========================================================= */
 window.APP_CONFIG = {
+  // 云端同步总开关（改为 true 可重新启用跨设备同步，但会重新要求登录）
+  CLOUD_SYNC_ENABLED: false,
+  // 以下为 Supabase 配置，仅在 CLOUD_SYNC_ENABLED=true 时生效
   SUPABASE_URL: 'https://jzrmreqbbxshekvvuhkb.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_p_-STPaJnFGnkPfTjl_tBA_yp8xYKP_',
   // 联网热榜接口：由 Cloudflare Pages 服务端函数 /api/trending 提供真实数据。

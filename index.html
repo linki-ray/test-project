@@ -58,30 +58,12 @@
       <header id="topbar">
         <h1 id="pageTitle">每日计划</h1>
         <div class="top-right">
-          <span id="syncPill" class="sync-pill" title="同步状态">● 本地</span>
-          <button id="accountBtn" class="icon-btn" title="账号">账号</button>
+          <span id="syncPill" class="sync-pill" title="数据存储于本机">● 本地</span>
           <div id="clock" class="clock"></div>
         </div>
       </header>
       <section id="pageRoot" class="page-root"></section>
     </main>
-  </div>
-
-  <!-- 登录 / 云端同步 -->
-  <div id="loginOverlay" class="login-overlay hidden">
-    <div class="login-card">
-      <div class="login-brand"><span class="brand-dot"></span><span>工作台 · 云端同步</span></div>
-      <p class="login-tip">用同一邮箱+密码登录，手机与电脑共用同一份数据</p>
-      <div class="login-tabs">
-        <button class="ltab active" data-mode="signin">登录</button>
-        <button class="ltab" data-mode="signup">注册</button>
-      </div>
-      <input id="loginEmail" class="inp" type="email" placeholder="邮箱" autocomplete="username" />
-      <input id="loginPwd" class="inp" type="password" placeholder="密码（≥6位）" autocomplete="current-password" />
-      <button id="loginSubmit" class="btn-primary">登录</button>
-      <p id="loginMsg" class="login-msg"></p>
-      <p class="login-foot">数据存于你的私有云端账号，仅你可见</p>
-    </div>
   </div>
 
   <!-- 弹窗容器 -->
