@@ -13,11 +13,40 @@ App.pages = App.pages || {};
 (function () {
   var U = App.U, S = App.Store;
 
-  /* ---------- 金融数据代理（服务端 /api/finance，绕开浏览器跨域 CORS） ---------- */
-  function fetchFinance(params) {
-    var base = (window.APP_CONFIG && window.APP_CONFIG.FINANCE_API) || '/api/finance';
-    var qs = Object.keys(params).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); }).join('&');
-    return U.fetchJSON(base + '?' + qs, 12000);
+  /* ---------- 腾讯行情（前端 JSONP 直连；浏览器原生解码 GBK，中文正常） ---------- */
+  function tencentCode(code) {
+    code = String(code).replace(/^(sh|sz|bj)/i, '').toLowerCase();
+    if (/^\d{6}$/.test(code)) return (code[0] === '6' ? 'sh' : 'sz') + code;
+    return code;
+  }
+  function parseTencentRaw(raw) {
+    var p = raw.split('~');
+    var amount = 0; if (p[35]) { var parts = p[35].split('/'); amount = parseFloat(parts[2]) || 0; }
+    return {
+      code: p[2] || '', name: p[1] || '',
+      price: parseFloat(p[3]) || 0, prevClose: parseFloat(p[4]) || 0, open: parseFloat(p[5]) || 0,
+      chg: parseFloat(p[31]) || 0, chgPct: parseFloat(p[32]) || 0,
+      high: parseFloat(p[33]) || 0, low: parseFloat(p[34]) || 0,
+      turnover: parseFloat(p[37]) || 0, pe: parseFloat(p[38]) || 0,
+      amount: amount, volumeRatio: parseFloat(p[46]) || 0,
+      mv: parseFloat(p[44]) ? parseFloat(p[44]) * 1e8 : 0
+    };
+  }
+  function jsonpTencent(secids) {
+    return new Promise(function (resolve) {
+      var s = document.createElement('script');
+      s.src = 'https://qt.gtimg.cn/q=' + secids;
+      s.onload = function () {
+        var out = [];
+        secids.split(',').forEach(function (code) {
+          var raw = window['v_' + code];
+          if (typeof raw === 'string' && raw.indexOf('~') > -1) out.push(parseTencentRaw(raw));
+        });
+        resolve(out); s.remove();
+      };
+      s.onerror = function () { resolve([]); s.remove(); };
+      document.body.appendChild(s);
+    });
   }
 
   /* ---------- 工具：东方财富 secid ---------- */
@@ -246,10 +275,10 @@ App.pages = App.pages || {};
     // 拉取数据（联网实时）
     function loadIndices(manual) {
       if (manual) U.$('#idxSrc').innerHTML = '<span class="live-dot wait"></span> 刷新中…';
-      fetchFinance({ type: 'indices' })
-        .then(function (j) {
-          if (!j || !j.ok || !j.items || !j.items.length) throw new Error('empty');
-          showIdx(j.items); saveSnap('indices', j.items);
+      jsonpTencent('sh000001,sz399001,sz399006,sh000688')
+        .then(function (list) {
+          if (!list || !list.length) throw new Error('empty');
+          showIdx(list); saveSnap('indices', list);
           U.$('#idxSrc').innerHTML = '<span class="live-dot on"></span> 实时';
         }).catch(function () {
           U.$('#idxSrc').innerHTML = '<span class="live-dot off"></span> 获取失败';
@@ -258,10 +287,13 @@ App.pages = App.pages || {};
     }
     function loadSectors(manual) {
       if (manual) U.$('#secSrc').innerHTML = '<span class="live-dot wait"></span> 刷新中…';
-      fetchFinance({ type: 'sectors' })
+      emJSON('https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=20&po=1&fid=f3&fs=m:90+t:2&fields=f12,f14,f3')
         .then(function (j) {
-          if (!j || !j.ok || !j.items || !j.items.length) throw new Error('empty');
-          showSectors(j.items); saveSnap('sectors', j.items);
+          var diff = (j.data && j.data.diff) || {};
+          var arr = Array.isArray(diff) ? diff : Object.values(diff);
+          var list = arr.map(function (d) { return { code: d.f12, name: d.f14, chgPct: (d.f3 || 0) / 100 }; }).filter(function (x) { return x.name; });
+          if (!list.length) throw new Error('empty');
+          showSectors(list); saveSnap('sectors', list);
           U.$('#secSrc').innerHTML = '<span class="live-dot on"></span> 实时';
         }).catch(function () {
           U.$('#secSrc').innerHTML = '<span class="live-dot off"></span> 获取失败';
@@ -318,18 +350,18 @@ App.pages = App.pages || {};
     function analyze(code) {
       code = String(code).replace(/^(sh|sz)/i, '');
       U.clear(reportBox); reportBox.appendChild(U.el('div', { class: 'empty', text: '加载行情与分析中…' }));
+      var secid = toSecid(code);
+      if (!secid) { U.toast('代码格式不正确'); return; }
       Promise.all([
-        fetchFinance({ type: 'quote', code: code }),
-        fetchFinance({ type: 'kline', code: code, klt: 101, lmt: 120 }),
-        fetchFinance({ type: 'kline', code: code, klt: 102, lmt: 60 })
+        jsonpTencent(tencentCode(code)),
+        fetchKline(secid, 101, 120),
+        fetchKline(secid, 102, 60)
       ]).then(function (res) {
-        var qj = res[0], dj = res[1], wj = res[2];
-        if (!qj || !qj.ok || !qj.item) throw new Error('quote failed');
-        var q = qj.item;
-        var daily = (dj && dj.items) || [];
-        var weekly = (wj && wj.items) || [];
-        if (!daily.length) throw new Error('kline failed');
-        buildReport(q, daily, weekly, code); saveHist(code, q.name);
+        var qlist = res[0], daily = res[1], weekly = res[2];
+        if (!qlist || !qlist.length) throw new Error('quote failed');
+        var q = qlist[0];
+        if (!daily || !daily.length) throw new Error('kline failed');
+        buildReport(q, daily, weekly || [], code); saveHist(code, q.name);
       }).catch(function () {
         reportBox.innerHTML = ''; reportBox.appendChild(U.el('div', { class: 'empty', text: '行情接口暂不可用，请稍后重试（需联网）' }));
       });
