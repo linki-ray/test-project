@@ -130,15 +130,6 @@ App.pages = App.pages || {};
     });
   }
 
-  /* ---------- 示例资讯（明确标注「示例」，非行情数据） ---------- */
-  var DEMO_NEWS = [
-    { title: '央行公开市场净投放，流动性边际宽松', time: '09:15', tag: '宏观' },
-    { title: '半导体板块获主力资金大幅流入', time: '10:02', tag: '题材' },
-    { title: '新能源车企公布月度交付数据，环比回暖', time: '11:20', tag: '行业' },
-    { title: '北向资金今日净买入超 50 亿元', time: '14:30', tag: '资金' },
-    { title: '多家券商看好三季度消费复苏', time: '15:10', tag: '研报' }
-  ];
-
   /* ============================================================
      主渲染
      ============================================================ */
@@ -195,7 +186,12 @@ App.pages = App.pages || {};
 
     // 资讯
     var newsCard = U.el('div', { class: 'card' });
-    newsCard.appendChild(U.el('div', { class: 'card-title', html: '市场资讯 <span class="demo-badge">示例</span> <button class="btn ghost sm" style="margin-left:8px" id="newsFavTip">收藏说明</button>' }));
+    newsCard.appendChild(U.el('div', { class: 'card-title' }, [
+      document.createTextNode('市场资讯 '),
+      U.el('span', { class: 'src-tag', id: 'newsSrc' }),
+      U.el('button', { class: 'btn ghost xs', style: 'float:right;margin-top:-2px', text: '🔄 刷新', onclick: function () { loadNews(true); } }),
+      U.el('button', { class: 'btn ghost xs', style: 'float:right;margin-top:-2px;margin-right:6px', text: '收藏说明', onclick: function () { U.modal({ title: '收藏说明', body: '点击任意条目右侧 ☆ 即可收藏到本地。收藏与历史快照均永久留存，不受存储模式影响。' }); } })
+    ]));
     var newsBox = U.el('div'); newsCard.appendChild(newsBox);
     wrap.appendChild(newsCard);
 
@@ -249,8 +245,9 @@ App.pages = App.pages || {};
       U.clear(newsBox);
       list.forEach(function (n) {
         var r = U.el('div', { class: 'quote-row' });
-        r.appendChild(U.el('div', {}, [U.el('div', { text: n.title }), U.el('div', { class: 'muted', text: n.time + ' · ' + (n.tag || '') })]));
-        r.appendChild(U.el('button', { class: 'icon-btn', html: '☆', onclick: function () { addFav({ type: 'news', name: n.title, time: n.time }); } }));
+        var titleEl = U.el('div', { style: 'cursor:pointer', text: n.title, onclick: function () { if (n.url) window.open(n.url, '_blank'); } });
+        r.appendChild(U.el('div', {}, [titleEl, U.el('div', { class: 'muted', text: n.time + ' · ' + (n.tag || '') })]));
+        r.appendChild(U.el('button', { class: 'icon-btn', html: '☆', onclick: function () { addFav({ type: 'news', name: n.title, time: n.time, url: n.url }); } }));
         newsBox.appendChild(r);
       });
     }
@@ -262,10 +259,6 @@ App.pages = App.pages || {};
       showSectors(snap.sectors || []);
       showNews(snap.news || []);
     }
-
-    U.$('#newsFavTip').addEventListener('click', function () {
-      U.modal({ title: '收藏说明', body: '点击任意条目右侧 ☆ 即可收藏到本地。收藏与历史快照均永久留存，不受存储模式影响。' });
-    });
 
     // 拉取数据（联网实时）
     function loadIndices(manual) {
@@ -280,41 +273,52 @@ App.pages = App.pages || {};
           if (!manual) U.toast('大盘数据获取失败，请检查网络或稍后重试');
         });
     }
-    // 板块龙头（腾讯自选股真实行情 qt.gtimg.cn）。展示各板块代表股实时涨跌均值。
-    var SECTOR_LEADERS = [
-      { name: '酿酒', codes: ['sh600519', 'sz000858'] },
-      { name: '半导体', codes: ['sh688981', 'sz002371'] },
-      { name: '新能源', codes: ['sz300750', 'sz002594'] },
-      { name: '银行', codes: ['sh601398', 'sh600036'] },
-      { name: '券商', codes: ['sh600030', 'sh600837'] },
-      { name: '医药', codes: ['sh600276', 'sz300760'] },
-      { name: '地产', codes: ['sh600048', 'sz000002'] },
-      { name: '家电', codes: ['sz000333', 'sh600690'] }
+    // 板块题材：用板块 ETF 直接跟踪各行业实时涨跌（腾讯自选股 qt.gtimg.cn）
+    var SECTOR_ETFS = [
+      { name: '酿酒', code: 'sh512690', lead: '酒ETF鹏华' },
+      { name: '半导体', code: 'sh512480', lead: '半导体ETF国联安' },
+      { name: '新能源', code: 'sh516160', lead: '新能源ETF南方' },
+      { name: '银行', code: 'sh512800', lead: '银行ETF华宝' },
+      { name: '券商', code: 'sh512000', lead: '券商ETF华宝' },
+      { name: '医药', code: 'sh512010', lead: '医药ETF易方达' },
+      { name: '地产', code: 'sh512200', lead: '房地产ETF南方' },
+      { name: '家电', code: 'sz159996', lead: '家电ETF国泰' }
     ];
     function loadSectors(manual) {
       if (manual) U.$('#secSrc').innerHTML = '<span class="live-dot wait"></span> 刷新中…';
-      var allCodes = [];
-      SECTOR_LEADERS.forEach(function (s) { s.codes.forEach(function (c) { allCodes.push(c); }); });
-      jsonpTencent(allCodes.join(','))
+      var allCodes = SECTOR_ETFS.map(function (s) { return s.code; }).join(',');
+      jsonpTencent(allCodes)
         .then(function (list) {
           if (!list || !list.length) throw new Error('empty');
           var byCode = {};
-          list.forEach(function (x) { byCode[x.code] = x; });
-          var out = SECTOR_LEADERS.map(function (s) {
-            var leads = s.codes.map(function (c) { return byCode[c]; }).filter(Boolean);
-            var chgPct = leads.length ? leads.reduce(function (a, b) { return a + b.chgPct; }, 0) / leads.length : 0;
-            var leadName = leads.map(function (l) { return l.name; }).join('/');
-            return { name: s.name, chgPct: chgPct, lead: leadName, codes: s.codes };
+          // parseTencentRaw 返回的 code 字段不带 sh/sz 前缀，用 marketCode 统一成 sh512690 格式再匹配
+          list.forEach(function (x) { byCode[marketCode(x.code)] = x; });
+          var out = SECTOR_ETFS.map(function (s) {
+            var q = byCode[s.code];
+            return { name: s.name, chgPct: q ? q.chgPct : 0, lead: s.lead, code: s.code };
           });
+          out.sort(function (a, b) { return b.chgPct - a.chgPct; }); // 涨幅降序：涨的板块排前面
           showSectors(out); saveSnap('sectors', out);
           U.$('#secSrc').innerHTML = '<span class="live-dot on"></span> 腾讯实时';
         }).catch(function () {
           U.$('#secSrc').innerHTML = '<span class="live-dot off"></span> 获取失败';
         });
     }
-    loadIndices(); loadSectors();
-    // 资讯（示例，标注清晰）
-    showNews(DEMO_NEWS); saveSnap('news', DEMO_NEWS);
+    loadIndices(); loadSectors(); loadNews();
+
+    // 市场资讯（新浪财经全球财经快讯，实时更新）
+    function loadNews(manual) {
+      if (manual) U.$('#newsSrc').innerHTML = '<span class="live-dot wait"></span> 刷新中…';
+      var base = (window.APP_CONFIG && window.APP_CONFIG.NEWS_API) || '/api/news';
+      U.fetchJSON(base + '?num=20', 12000)
+        .then(function (j) {
+          if (!j || !j.ok || !j.items || !j.items.length) throw new Error('empty');
+          showNews(j.items); saveSnap('news', j.items);
+          U.$('#newsSrc').innerHTML = '<span class="live-dot on"></span> 新浪财经';
+        }).catch(function () {
+          U.$('#newsSrc').innerHTML = '<span class="live-dot off"></span> 获取失败';
+        });
+    }
 
     function saveSnap(key, val) {
       var snap = S.get('fin_snap_' + S.todayStr()) || {}; snap[key] = val; S.set('fin_snap_' + S.todayStr(), snap);

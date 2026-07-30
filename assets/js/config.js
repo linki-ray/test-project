@@ -19,5 +19,7 @@ window.APP_CONFIG = {
   KLINE_API: 'https://test-project-ek2.pages.dev/api/kline',
   // 视频链接自动抓取：由 Cloudflare Pages 服务端函数 /api/fetch-video 尝试提取标题/文案。
   // 抖音/小红书会限制外链抓取，失败时前端会引导手动补充或把链接发我（对话里）深度解析。
-  FETCH_VIDEO_API: 'https://test-project-ek2.pages.dev/api/fetch-video'
+  FETCH_VIDEO_API: 'https://test-project-ek2.pages.dev/api/fetch-video',
+  // 市场资讯接口：由 Cloudflare Pages 服务端函数 /api/news 代理新浪财经全球财经快讯（绕开浏览器跨域）。
+  NEWS_API: 'https://test-project-ek2.pages.dev/api/news'
 };
