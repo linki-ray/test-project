@@ -19,7 +19,12 @@ App.pages = App.pages || {};
   /* ---------- 腾讯行情（前端 JSONP 直连；浏览器原生解码 GBK，中文正常） ---------- */
   function tencentCode(code) {
     code = String(code).replace(/^(sh|sz|bj)/i, '').toLowerCase();
-    if (/^\d{6}$/.test(code)) return (code[0] === '6' ? 'sh' : 'sz') + code;
+    if (/^\d{6}$/.test(code)) {
+      // 6=沪市主板；5=沪市ETF/LOF；8/4=北交所；其余(0/2/3/1)=深市
+      if (code[0] === '6' || code[0] === '5') return 'sh' + code;
+      if (code[0] === '8' || code[0] === '4') return 'bj' + code;
+      return 'sz' + code;
+    }
     return code;
   }
   function parseTencentRaw(raw) {
@@ -48,7 +53,11 @@ App.pages = App.pages || {};
         var out = [];
         secids.split(',').forEach(function (code) {
           var raw = window['v_' + code];
-          if (typeof raw === 'string' && raw.indexOf('~') > -1) out.push(parseTencentRaw(raw));
+          if (typeof raw === 'string' && raw.indexOf('~') > -1) {
+            var item = parseTencentRaw(raw);
+            item._code = code; // 保留原始带前缀代码，便于后续精确匹配
+            out.push(item);
+          }
         });
         resolve(out); s.remove();
       };
@@ -59,9 +68,14 @@ App.pages = App.pages || {};
 
   /* ---------- 工具：生成统一代码（sh600519 / sz300750 / bj...） ---------- */
   function marketCode(code) {
-    code = String(code).replace(/\s/g, '');
-    if (/^(sh|sz|bj)\d{6}$/i.test(code)) return code.toLowerCase();
-    if (/^\d{6}$/.test(code)) return (code[0] === '6' ? 'sh' : (code[0] === '8' || code[0] === '4' ? 'bj' : 'sz')) + code;
+    code = String(code).replace(/\s/g, '').toLowerCase();
+    if (/^(sh|sz|bj)\d{6}$/.test(code)) return code;
+    if (/^\d{6}$/.test(code)) {
+      // 6=沪市主板；5=沪市ETF/LOF；8/4=北交所；其余(0/2/3/1)=深市
+      if (code[0] === '6' || code[0] === '5') return 'sh' + code;
+      if (code[0] === '8' || code[0] === '4') return 'bj' + code;
+      return 'sz' + code;
+    }
     return code;
   }
 
@@ -95,6 +109,37 @@ App.pages = App.pages || {};
       });
     });
   }
+
+  /* ---------- 通用可视化组件 ---------- */
+  function metric(label, val, cls) {
+    var d = U.el('div', { style: 'background:var(--surface-2);border-radius:10px;padding:10px' });
+    d.appendChild(U.el('div', { class: 'muted', style: 'font-size:12px', text: label }));
+    d.appendChild(U.el('div', { class: cls === 'up' ? 'up' : cls === 'down' ? 'down' : '', style: 'font-weight:700;font-size:15px', text: val }));
+    return d;
+  }
+  function klineSvg(daily, opts) {
+    opts = opts || {};
+    var w = opts.width || 600, h = opts.height || 160, pad = 10;
+    var lows = daily.map(function (k) { return k.low; }), highs = daily.map(function (k) { return k.high; });
+    var min = Math.min.apply(null, lows), max = Math.max.apply(null, highs);
+    var cw = (w - pad * 2) / daily.length;
+    var svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" width="100%" style="margin-top:10px">';
+    daily.forEach(function (k, i) {
+      var x = pad + i * cw + cw / 2;
+      var yO = h - pad - (k.open - min) / (max - min) * (h - pad * 2);
+      var yC = h - pad - (k.close - min) / (max - min) * (h - pad * 2);
+      var yH = h - pad - (k.high - min) / (max - min) * (h - pad * 2);
+      var yL = h - pad - (k.low - min) / (max - min) * (h - pad * 2);
+      var col = k.close >= k.open ? '#f5222d' : '#16a34a';
+      svg += '<line x1="' + x + '" y1="' + yH + '" x2="' + x + '" y2="' + yL + '" stroke="' + col + '" stroke-width="1"/>';
+      svg += '<rect x="' + (x - cw * 0.3) + '" y="' + Math.min(yO, yC) + '" width="' + (cw * 0.6) + '" height="' + Math.abs(yC - yO) + '" fill="' + col + '"/>';
+    });
+    svg += '</svg>';
+    var wrapSvg = U.el('div');
+    wrapSvg.innerHTML = svg;
+    return wrapSvg.firstChild;
+  }
+
   function searchStock(kw) {
     // 腾讯 smartbox 实际返回全局变量：v_hint="sh~600519~贵州茅台~gzmt~GP-A"
     // （部分旧接口返回 v_smartbox=[...] 数组，这里一并兼容）
@@ -234,12 +279,41 @@ App.pages = App.pages || {};
       U.clear(secBox);
       list.forEach(function (x) {
         var up = x.chgPct >= 0;
-        var c = U.el('div', { class: 'card', style: 'margin-bottom:0;background:var(--surface-2);padding:12px' });
+        var c = U.el('div', {
+          class: 'card',
+          style: 'margin-bottom:0;background:var(--surface-2);padding:12px;cursor:pointer',
+          onclick: function () { showSectorDetail(x.code, x.name, x.lead); }
+        });
         c.appendChild(U.el('div', { style: 'font-weight:600', text: x.name + (x.lead ? ' · ' + x.lead : '') }));
         c.appendChild(U.el('div', { class: up ? 'up' : 'down', style: 'font-weight:700', text: (up ? '+' : '') + x.chgPct.toFixed(2) + '%' }));
-        c.appendChild(U.el('button', { class: 'icon-btn', html: '☆', style: 'float:right;margin-top:-28px', onclick: function () { addFav({ type: 'sector', name: x.name, chgPct: x.chgPct }); } }));
+        c.appendChild(U.el('button', {
+          class: 'icon-btn', html: '☆', style: 'float:right;margin-top:-28px',
+          onclick: function (e) { e.stopPropagation(); addFav({ type: 'sector', name: x.name, chgPct: x.chgPct }); }
+        }));
         secBox.appendChild(c);
       });
+    }
+    function showSectorDetail(code, name, lead) {
+      var body = U.el('div');
+      body.appendChild(U.el('div', { class: 'muted', style: 'margin-bottom:10px', text: '加载 ' + (lead || code) + ' K线…' }));
+      U.modal({ title: name + ' · 板块ETF走势', body: body });
+      Promise.all([jsonpTencent(code), fetchKline(code, 240, 90)])
+        .then(function (res) {
+          var q = res[0] && res[0][0], daily = res[1];
+          if (!q || !daily || !daily.length) throw new Error('empty');
+          U.clear(body);
+          var up = q.chgPct >= 0;
+          var hg = U.el('div', { class: 'grid c3' });
+          hg.appendChild(metric('现价', q.price.toFixed(2), ''));
+          hg.appendChild(metric('涨跌幅', (up ? '+' : '') + q.chgPct.toFixed(2) + '%', up ? 'up' : 'down'));
+          hg.appendChild(metric('成交额', (q.amount / 1e8).toFixed(2) + ' 亿', ''));
+          body.appendChild(hg);
+          body.appendChild(klineSvg(daily.slice(-40), { height: 180 }));
+          body.appendChild(U.el('div', { class: 'muted', style: 'margin-top:8px;font-size:12px', text: '数据来源：新浪财经日K线，近 90 个交易日' }));
+        }).catch(function () {
+          U.clear(body);
+          body.appendChild(U.el('div', { class: 'empty', text: 'K线加载失败，请检查网络或稍后重试' }));
+        });
     }
     function showNews(list) {
       U.clear(newsBox);
@@ -291,8 +365,8 @@ App.pages = App.pages || {};
         .then(function (list) {
           if (!list || !list.length) throw new Error('empty');
           var byCode = {};
-          // parseTencentRaw 返回的 code 字段不带 sh/sz 前缀，用 marketCode 统一成 sh512690 格式再匹配
-          list.forEach(function (x) { byCode[marketCode(x.code)] = x; });
+          // 优先用 jsonpTencent 返回的原始带前缀代码 _code 匹配；兜底用 marketCode
+          list.forEach(function (x) { byCode[x._code || marketCode(x.code)] = x; });
           var out = SECTOR_ETFS.map(function (s) {
             var q = byCode[s.code];
             return { name: s.name, chgPct: q ? q.chgPct : 0, lead: s.lead, code: s.code };
@@ -480,34 +554,6 @@ App.pages = App.pages || {};
       if (score >= 55) return '持有 / 观望';
       if (score >= 35) return '观望 / 减仓';
       return '空仓 / 规避';
-    }
-    function metric(label, val, cls) {
-      var d = U.el('div', { style: 'background:var(--surface-2);border-radius:10px;padding:10px' });
-      d.appendChild(U.el('div', { class: 'muted', style: 'font-size:12px', text: label }));
-      d.appendChild(U.el('div', { class: cls === 'up' ? 'up' : cls === 'down' ? 'down' : '', style: 'font-weight:700;font-size:15px', text: val }));
-      return d;
-    }
-    function klineSvg(daily) {
-      var w = 600, h = 160, pad = 10;
-      var lows = daily.map(function (k) { return k.low; }), highs = daily.map(function (k) { return k.high; });
-      var min = Math.min.apply(null, lows), max = Math.max.apply(null, highs);
-      var cw = (w - pad * 2) / daily.length;
-      var svg = '<svg viewBox="0 0 ' + w + ' ' + h + '" width="100%" style="margin-top:10px">';
-      daily.forEach(function (k, i) {
-        var x = pad + i * cw + cw / 2;
-        var yO = h - pad - (k.open - min) / (max - min) * (h - pad * 2);
-        var yC = h - pad - (k.close - min) / (max - min) * (h - pad * 2);
-        var yH = h - pad - (k.high - min) / (max - min) * (h - pad * 2);
-        var yL = h - pad - (k.low - min) / (max - min) * (h - pad * 2);
-        var col = k.close >= k.open ? '#f5222d' : '#16a34a';
-        svg += '<line x1="' + x + '" y1="' + yH + '" x2="' + x + '" y2="' + yL + '" stroke="' + col + '" stroke-width="1"/>';
-        svg += '<rect x="' + (x - cw * 0.3) + '" y="' + Math.min(yO, yC) + '" width="' + (cw * 0.6) + '" height="' + Math.abs(yC - yO) + '" fill="' + col + '"/>';
-      });
-      // MA20 线
-      svg += '</svg>';
-      var wrapSvg = U.el('div');
-      wrapSvg.innerHTML = svg;
-      return wrapSvg.firstChild;
     }
 
     function saveHist(code, name) {

@@ -28,6 +28,8 @@
   --nav-green-soft: #e9f9f0;
   --nav-purple: #8b6cf7;
   --nav-purple-soft: #f2efff;
+  --nav-teal: #1db5bd;
+  --nav-teal-soft: #e3fafa;
 
   /* 涨跌 */
   --red: #ef4848;
@@ -102,6 +104,7 @@ body {
 .nav-item[data-color="yellow"] .nav-ico-wrap { color: var(--nav-yellow); background: var(--nav-yellow-soft); }
 .nav-item[data-color="green"] .nav-ico-wrap { color: var(--nav-green); background: var(--nav-green-soft); }
 .nav-item[data-color="purple"] .nav-ico-wrap { color: var(--nav-purple); background: var(--nav-purple-soft); }
+.nav-item[data-color="teal"] .nav-ico-wrap { color: var(--nav-teal); background: var(--nav-teal-soft); }
 
 .nav-item.active {
   background: var(--surface-2); color: var(--text); font-weight: 700;
@@ -114,6 +117,7 @@ body {
 .nav-item.active[data-color="yellow"] { box-shadow: inset 3px 0 0 var(--nav-yellow); }
 .nav-item.active[data-color="green"] { box-shadow: inset 3px 0 0 var(--nav-green); }
 .nav-item.active[data-color="purple"] { box-shadow: inset 3px 0 0 var(--nav-purple); }
+.nav-item.active[data-color="teal"] { box-shadow: inset 3px 0 0 var(--nav-teal); }
 
 .nav-settings {
   display: flex; align-items: center; gap: 11px;
@@ -271,6 +275,7 @@ body {
 
 /* 网格 */
 .grid { display: grid; gap: 12px; }
+.grid.c1 { grid-template-columns: 1fr; }
 .grid.c2 { grid-template-columns: repeat(2, 1fr); }
 .grid.c3 { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 640px) { .grid.c3 { grid-template-columns: 1fr; } .grid.c2 { grid-template-columns: 1fr; } }
@@ -280,6 +285,18 @@ body {
 .quote-row:last-child { border-bottom: none; }
 .up { color: var(--red); }
 .down { color: var(--green); }
+
+/* 阅读器全屏 */
+.reader-fullscreen {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  left: calc(var(--nav-w) + 32px);
+  z-index: 100;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+}
+@media (max-width: 900px) {
+  .reader-fullscreen { left: 0; }
+}
 
 /* 列表空态 */
 .empty { text-align: center; color: var(--text-3); padding: 32px 0; font-size: 14px; }
