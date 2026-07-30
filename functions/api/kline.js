@@ -1,7 +1,7 @@
 /**
  * Cloudflare Pages Function —— 个股 K 线代理
  *
- * 数据源：新浪财经 K 线接口（非东方财富）
+ * 数据源：新浪财经 K 线接口（独立第三方源，仅用于 K 线历史，与行情源分离）
  *   https://money.finance.sina.com.cn/.../CN_MarketData.getKLineData
  *
  * 浏览器直连新浪会被 CORS 拦截，故由本服务端函数代理，

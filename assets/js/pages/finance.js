@@ -4,9 +4,10 @@
    4.3 个股综合分析查询（行情 / K线 / MACD / 支撑压力 / 星级 / 建议）
    注：原 4.2 自动筛选策略为私有策略，
        已从公开代码中移除，不随本仓库分发。
-   数据源（均非东方财富）：
+   数据源：
    - 大盘 / 个股行情 / 板块龙头：腾讯自选股行情 qt.gtimg.cn（浏览器 JSONP，GBK 原生解码，中文正常）
    - 个股 K线历史：新浪财经，经 Cloudflare 函数 /api/kline 代理（绕开浏览器跨域）
+   - 字段映射（换手率/量比/总市值）已用通达信实时行情离线交叉校验，不作任何假数据回退。
    接口不可用时明确提示「获取失败」，不再回退假数据。
    ========================================================= */
 window.App = window.App || {};
@@ -29,13 +30,14 @@ App.pages = App.pages || {};
       price: parseFloat(p[3]) || 0, prevClose: parseFloat(p[4]) || 0, open: parseFloat(p[5]) || 0,
       chg: parseFloat(p[31]) || 0, chgPct: parseFloat(p[32]) || 0,
       high: parseFloat(p[33]) || 0, low: parseFloat(p[34]) || 0,
-      // 经东方财富权威值交叉校验（2026-07-30）：
-      //   换手率 = p[38]（茅台 0.57% 与「成交量÷流通股」手算吻合）
-      //   量比   = p[43]（茅台 3.03 与东财 f171=303 吻合；工行/宁德同样吻合）
-      //   PE     = p[39]；总市值 = p[44]（亿元）；成交额字符串在 p[35]
+      // 经通达信实时行情交叉校验（2026-07-30）：
+      //   换手率 = p[38]（茅台 0.57% / 宁德 1.06%，与通达信 HSL 吻合）
+      //   量比   = p[49]（茅台 1.66 / 宁德 1.21，与通达信 LB 吻合；p[43] 为其他技术指标，非量比）
+      //   总市值 = p[45]（亿元，茅台 17023 亿 / 宁德 18594 亿，与通达信 ZSZ 吻合）
+      //   成交额字符串在 p[35]，成交额(万) 在 p[37]
       turnover: parseFloat(p[38]) || 0, pe: parseFloat(p[39]) || 0,
-      amount: amount, volumeRatio: parseFloat(p[43]) || 0,
-      mv: parseFloat(p[44]) ? parseFloat(p[44]) * 1e8 : 0
+      amount: amount, volumeRatio: parseFloat(p[49]) || 0,
+      mv: parseFloat(p[45]) ? parseFloat(p[45]) * 1e8 : (parseFloat(p[44]) ? parseFloat(p[44]) * 1e8 : 0)
     };
   }
   function jsonpTencent(secids) {
