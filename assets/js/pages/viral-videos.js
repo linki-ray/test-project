@@ -11,38 +11,45 @@ App.pages['viral-videos'] = function (root) {
   var U = App.U, S = App.Store;
   App.U.clear(root);
 
-  var TRACKS = ['萌宠日常', '宠物科普', '宠物好物', '宠物剧情', '猫咪', '狗狗', '异宠', '萌宠穿搭'];
+  // 二级类目：一级（宠物大类）× 二级（内容形式）
+  var CATS = [
+    { id: 'cat', name: '🐱 猫咪', tracks: ['猫咪日常', '猫咪剧情', '猫咪科普', '猫咪好物', '猫咪穿搭'] },
+    { id: 'dog', name: '🐶 狗狗', tracks: ['狗狗日常', '狗狗剧情', '狗狗科普', '狗狗好物', '狗狗穿搭'] },
+    { id: 'exotic', name: '🐉 异宠', tracks: ['异宠日常', '异宠科普', '异宠好物'] },
+    { id: 'general', name: '📂 综合', tracks: ['综合日常', '综合剧情', '综合科普', '综合好物', '综合穿搭'] }
+  ];
+  var TRACKS = CATS.reduce(function (a, c) { return a.concat(c.tracks); }, []);
   var REASON_KEYS = [
     ['hook', '开头钩子'], ['emotion', '情绪共鸣'], ['twist', '剧情反转'],
     ['visual', '视觉画面'], ['copy', '文案话术'], ['bgm', '热门 BGM'], ['tag', '标签流量逻辑']
   ];
-  var state = { platform: 'all', track: 'all', starred: 'all', dateFrom: '', dateTo: '', view: 'all', selected: {}, batchMode: false };
+  var state = { platform: 'all', catGroup: 'all', track: 'all', starred: 'all', dateFrom: '', dateTo: '', view: 'all', selected: {}, batchMode: false };
 
-  // 示例素材池（接入真实接口后替换）—— 已聚焦宠物赛道，供结构参考
+  // 示例素材池（接入真实接口后替换）—— 已按二级类目组织，供结构参考
   var POOL = [
-    { platform: 'douyin', track: '猫咪', title: '猫咪第一次吃冻干的反应', hot: 982000,
-      reason: { hook: '“它闻了闻直接愣住”', emotion: '治愈萌系共鸣', twist: '最后疯狂讨要更多', visual: '近距离特写猫咪表情', copy: '谁懂啊这个表情', bgm: '可爱音效', tag: '#萌宠日常 #猫咪 情绪流量' },
+    { platform: 'douyin', track: '猫咪日常', title: '猫咪第一次吃冻干的反应', hot: 982000,
+      reason: { hook: '“它闻了闻直接愣住”', emotion: '治愈萌系共鸣', twist: '最后疯狂讨要更多', visual: '近距离特写猫咪表情', copy: '谁懂啊这个表情', bgm: '可爱音效', tag: '#猫咪日常 #萌宠日常 情绪流量' },
       inspire: { script: '反差萌→真实反应→治愈结尾', shoot: '近距离抓拍+慢动作', copyTpl: '没想到__', topic: '猫咪反应视频/萌宠日常' } },
-    { platform: 'xhs', track: '宠物好物', title: '平价猫粮测评红黑榜', hot: 763000,
-      reason: { hook: '“别再交智商税”', emotion: '养宠避坑心理', twist: '平价黑马胜出', visual: '产品对比图+成分表', copy: '闭眼入不踩雷', bgm: '科技感', tag: '#宠物好物 精准人群' },
+    { platform: 'xhs', track: '综合好物', title: '平价猫粮测评红黑榜', hot: 763000,
+      reason: { hook: '“别再交智商税”', emotion: '养宠避坑心理', twist: '平价黑马胜出', visual: '产品对比图+成分表', copy: '闭眼入不踩雷', bgm: '科技感', tag: '#综合好物 #宠物好物 精准人群' },
       inspire: { script: '结论先行→横评→推荐', shoot: '产品摆拍+对比表格', copyTpl: '__元买__', topic: '平价猫粮/宠物用品' } },
-    { platform: 'douyin', track: '宠物科普', title: '猫咪为什么半夜跑酷', hot: 654000,
-      reason: { hook: '“你家猫也这样？”', emotion: '铲屎官共鸣', twist: '科学原理解释', visual: '手绘动画+实拍', copy: '涨知识了', bgm: '悬疑转场', tag: '#宠物科普 知识普惠' },
+    { platform: 'douyin', track: '猫咪科普', title: '猫咪为什么半夜跑酷', hot: 654000,
+      reason: { hook: '“你家猫也这样？”', emotion: '铲屎官共鸣', twist: '科学原理解释', visual: '手绘动画+实拍', copy: '涨知识了', bgm: '悬疑转场', tag: '#猫咪科普 #宠物科普 知识普惠' },
       inspire: { script: '现象→原理→养猫建议', shoot: '字幕+实拍穿插', copyTpl: '其实__是__', topic: '养猫误区/宠物科普' } },
-    { platform: 'xhs', track: '萌宠穿搭', title: '狗狗秋冬穿衣搭配', hot: 821000,
-      reason: { hook: '“这样穿太可爱了”', emotion: '治愈种草', twist: '三套风格对比', visual: '全身镜自拍九宫格', copy: '照着穿不出错', bgm: '时尚走秀BGM', tag: '#萌宠穿搭 精准人群' },
-      inspire: { script: '痛点→搭配公式→示范', shoot: '同款单品多角度', copyTpl: '__显可爱__', topic: '小型犬/猫咪穿搭' } },
-    { platform: 'douyin', track: '宠物剧情', title: '捡到流浪猫后它报恩了', hot: 1130000,
-      reason: { hook: '“它在门口等了你一夜”', emotion: '孤独温情共鸣', twist: '反转治愈', visual: '暗调运镜+暖光', copy: '结局泪目', bgm: '悬疑→温情', tag: '#宠物剧情 情绪向' },
+    { platform: 'xhs', track: '狗狗穿搭', title: '狗狗秋冬穿衣搭配', hot: 821000,
+      reason: { hook: '“这样穿太可爱了”', emotion: '治愈种草', twist: '三套风格对比', visual: '全身镜自拍九宫格', copy: '照着穿不出错', bgm: '时尚走秀BGM', tag: '#狗狗穿搭 #萌宠穿搭 精准人群' },
+      inspire: { script: '痛点→搭配公式→示范', shoot: '同款单品多角度', copyTpl: '__显可爱__', topic: '小型犬/狗狗穿搭' } },
+    { platform: 'douyin', track: '猫咪剧情', title: '捡到流浪猫后它报恩了', hot: 1130000,
+      reason: { hook: '“它在门口等了你一夜”', emotion: '孤独温情共鸣', twist: '反转治愈', visual: '暗调运镜+暖光', copy: '结局泪目', bgm: '悬疑→温情', tag: '#猫咪剧情 #宠物剧情 情绪向' },
       inspire: { script: '悬念开头→铺垫→温情反转', shoot: '一镜到底+变光', copyTpl: '以为__其实__', topic: '救助故事/宠物剧情' } },
-    { platform: 'xhs', track: '狗狗', title: '每天遛狗30分钟打卡', hot: 542000,
-      reason: { hook: '“每天30分钟改变”', emotion: '自律共鸣', twist: '狗狗肉眼变帅', visual: '户外跟拍', copy: '跟着打卡', bgm: '轻快节奏', tag: '#遛狗 自律打卡' },
+    { platform: 'xhs', track: '狗狗日常', title: '每天遛狗30分钟打卡', hot: 542000,
+      reason: { hook: '“每天30分钟改变”', emotion: '自律共鸣', twist: '狗狗肉眼变帅', visual: '户外跟拍', copy: '跟着打卡', bgm: '轻快节奏', tag: '#狗狗日常 #遛狗 自律打卡' },
       inspire: { script: '问题→动作拆解→效果', shoot: '侧面跟拍+字幕', copyTpl: '__分钟__', topic: '遛狗vlog/养狗日常' } },
-    { platform: 'douyin', track: '猫咪', title: '布偶猫第一次洗澡现场', hot: 905000,
-      reason: { hook: '“第一次洗澡名场面”', emotion: '搞笑萌系', twist: '意外超级配合', visual: '湿身特写+泡泡', copy: '笑死我了', bgm: '搞笑音效', tag: '#猫咪 搞笑流量' },
+    { platform: 'douyin', track: '猫咪日常', title: '布偶猫第一次洗澡现场', hot: 905000,
+      reason: { hook: '“第一次洗澡名场面”', emotion: '搞笑萌系', twist: '意外超级配合', visual: '湿身特写+泡泡', copy: '笑死我了', bgm: '搞笑音效', tag: '#猫咪日常 #猫咪 搞笑流量' },
       inspire: { script: '铺垫→冲突→反转配合', shoot: '固定机位全景', copyTpl: '没想到__', topic: '猫咪洗澡/搞笑萌宠' } },
-    { platform: 'xhs', track: '异宠', title: '仓鼠别墅布置攻略', hot: 431000,
-      reason: { hook: '“小窝还能这样改”', emotion: '种草治愈', twist: '平价改造惊艳', visual: '俯拍全景', copy: '手残党也会', bgm: '治愈系纯音乐', tag: '#异宠 小众圈层' },
+    { platform: 'xhs', track: '异宠日常', title: '仓鼠别墅布置攻略', hot: 431000,
+      reason: { hook: '“小窝还能这样改”', emotion: '种草治愈', twist: '平价改造惊艳', visual: '俯拍全景', copy: '手残党也会', bgm: '治愈系纯音乐', tag: '#异宠日常 #异宠 小众圈层' },
       inspire: { script: '痛点→改造步骤→成品', shoot: '延时摄影+字幕', copyTpl: '__元搞定__', topic: '仓鼠/异宠布置' } }
   ];
 
@@ -236,15 +243,16 @@ App.pages['viral-videos'] = function (root) {
   var fBar = U.el('div', { class: 'filter-bar' });
   var platSel = U.el('select', { class: 'input', onchange: function () { state.platform = this.value; render(); } },
     [U.el('option', { value: 'all', text: '全部平台' }), U.el('option', { value: 'douyin', text: '抖音' }), U.el('option', { value: 'xhs', text: '小红书' })]);
-  var trackSel = U.el('select', { class: 'input', onchange: function () { state.track = this.value; render(); } },
-    [U.el('option', { value: 'all', text: '全部赛道' })].concat(TRACKS.map(function (t) { return U.el('option', { value: t, text: t }); })));
   var fromD = U.el('input', { class: 'input', type: 'date', onchange: function () { state.dateFrom = this.value; render(); } });
   var toD = U.el('input', { class: 'input', type: 'date', onchange: function () { state.dateTo = this.value; render(); } });
-  fBar.appendChild(platSel); fBar.appendChild(trackSel); fBar.appendChild(fromD); fBar.appendChild(toD);
+  fBar.appendChild(platSel); fBar.appendChild(fromD); fBar.appendChild(toD);
   fCard.appendChild(U.el('div', { class: 'card-title', text: '筛选检索' }));
   fCard.appendChild(fBar);
-  // 赛道快捷标签
-  var trackChips = U.el('div', { class: 'filter-bar', id: 'vvTracks' });
+  // 一级类目（宠物大类）—— 点击切换下方二级标签
+  var catGroupBar = U.el('div', { class: 'filter-bar', id: 'vvCatGroups', style: 'margin-top:10px' });
+  fCard.appendChild(catGroupBar);
+  // 二级类目（内容形式，受一级控制）
+  var trackChips = U.el('div', { class: 'filter-bar', id: 'vvTracks', style: 'margin-top:8px' });
   fCard.appendChild(trackChips);
   root.appendChild(fCard);
 
@@ -252,9 +260,17 @@ App.pages['viral-videos'] = function (root) {
   root.appendChild(listBox);
 
   function renderTracks() {
+    // 一级类目 tab
+    U.clear(catGroupBar);
+    var groups = [{ id: 'all', name: '全部' }, { id: 'cat', name: '🐱 猫咪' }, { id: 'dog', name: '🐶 狗狗' }, { id: 'exotic', name: '🐉 异宠' }, { id: 'general', name: '📂 综合' }];
+    groups.forEach(function (g) {
+      catGroupBar.appendChild(U.el('span', { class: 'tag' + (state.catGroup === g.id ? ' active' : ''), text: g.name, onclick: function () { state.catGroup = g.id; state.track = 'all'; render(); } }));
+    });
+    // 二级类目标签（受一级控制）
     U.clear(trackChips);
-    ['all'].concat(TRACKS).forEach(function (t) {
-      trackChips.appendChild(U.el('span', { class: 'tag' + (state.track === t ? ' active' : ''), text: t === 'all' ? '全部赛道' : t, onclick: function () { state.track = t; trackSel.value = t; render(); } }));
+    var subs = state.catGroup === 'all' ? TRACKS : CATS.filter(function (c) { return c.id === state.catGroup; })[0].tracks;
+    subs.forEach(function (t) {
+      trackChips.appendChild(U.el('span', { class: 'tag sub' + (state.track === t ? ' active' : ''), text: t, onclick: function () { state.track = t; render(); } }));
     });
   }
 
@@ -389,12 +405,17 @@ App.pages['viral-videos'] = function (root) {
     var titleI = U.el('input', { class: 'input', placeholder: '视频标题' });
     var urlI = U.el('input', { class: 'input', placeholder: '外部视频链接（可选）' });
     var platI = U.el('select', { class: 'input' }, [U.el('option', { value: 'douyin', text: '抖音' }), U.el('option', { value: 'xhs', text: '小红书' })]);
-    var trackI = U.el('select', { class: 'input' }, TRACKS.map(function (t) { return U.el('option', { value: t, text: t }); }));
+    var catGroupI = U.el('select', { class: 'input' }, CATS.map(function (c) { return U.el('option', { value: c.id, text: c.name }); }));
+    var trackI = U.el('select', { class: 'input' });
+    function fillTrackI(cg) { U.clear(trackI); CATS.filter(function (c) { return c.id === cg; })[0].tracks.forEach(function (t) { trackI.appendChild(U.el('option', { value: t, text: t })); }); }
+    fillTrackI('cat');
+    catGroupI.onchange = function () { fillTrackI(this.value); };
     var noteI = U.el('textarea', { class: 'textarea', placeholder: '手动填写拆解笔记（开头钩子/情绪共鸣/反转/画面/文案/BGM/标签…）' });
     var fileI = U.el('input', { class: 'input', type: 'file', accept: 'image/*,video/*' });
     body.appendChild(field('标题', titleI));
     body.appendChild(field('平台', platI));
-    body.appendChild(field('赛道', trackI));
+    body.appendChild(field('大类', catGroupI));
+    body.appendChild(field('赛道（二级）', trackI));
     body.appendChild(field('链接', urlI));
     body.appendChild(field('截图/录屏', fileI));
     body.appendChild(field('拆解笔记', noteI));
@@ -427,18 +448,24 @@ App.pages['viral-videos'] = function (root) {
     var raw = (input.title + ' ' + (input.desc || '')).toLowerCase();
     var desc = input.desc || '';
 
-    // 1. 原视频赛道识别（参考）
-    var trackRules = [
-      { keys: ['剧情', '反转', '报恩', '故事', '情感', '泪目', '感动', '救助'], t: '宠物剧情' },
-      { keys: ['科普', '为什么', '为何', '原理', '知识', '误区', '涨知识', '怎么', '如何'], t: '宠物科普' },
-      { keys: ['穿搭', '衣服', '秋冬', '春夏', '搭配', '穿衣'], t: '萌宠穿搭' },
-      { keys: ['测评', '红黑榜', '好物', '种草', '平价', '推荐', '必买', '红榜', '黑榜', '避坑', '实测'], t: '宠物好物' },
-      { keys: ['猫', '喵', '布偶', '橘', '英短', '加菲', '狸花'], t: '猫咪' },
-      { keys: ['狗', '汪', '金毛', '柯基', '柴犬', '边牧', '遛狗', '萨摩'], t: '狗狗' },
-      { keys: ['仓鼠', '异宠', '爬宠', '龟', '兔', '鸟', '水族', '鱼'], t: '异宠' }
+    // 1. 原视频分类识别（一级宠物类型 × 二级内容形式 → 二级类目）
+    var petRules = [
+      { keys: ['猫', '喵', '布偶', '橘', '英短', '加菲', '狸花', '蓝猫', '缅因', '奶牛猫'], p: 'cat' },
+      { keys: ['狗', '汪', '金毛', '柯基', '柴犬', '边牧', '遛狗', '萨摩', '泰迪', '比熊'], p: 'dog' },
+      { keys: ['仓鼠', '异宠', '爬宠', '龟', '兔', '鸟', '水族', '鱼', '蜥蜴'], p: 'exotic' }
     ];
-    var track = '萌宠日常';
-    for (var i = 0; i < trackRules.length; i++) { if (trackRules[i].keys.some(function (k) { return raw.indexOf(k) > -1; })) { track = trackRules[i].t; break; } }
+    var formRules = [
+      { keys: ['剧情', '反转', '报恩', '故事', '情感', '泪目', '感动', '救助'], f: '剧情' },
+      { keys: ['科普', '为什么', '为何', '原理', '知识', '误区', '涨知识', '怎么', '如何'], f: '科普' },
+      { keys: ['穿搭', '衣服', '秋冬', '春夏', '搭配', '穿衣'], f: '穿搭' },
+      { keys: ['测评', '红黑榜', '好物', '种草', '平价', '推荐', '必买', '红榜', '黑榜', '避坑', '实测'], f: '好物' }
+    ];
+    var pet = 'general';
+    for (var i = 0; i < petRules.length; i++) { if (petRules[i].keys.some(function (k) { return raw.indexOf(k) > -1; })) { pet = petRules[i].p; break; } }
+    var form = '日常';
+    for (var fI = 0; fI < formRules.length; fI++) { if (formRules[fI].keys.some(function (k) { return raw.indexOf(k) > -1; })) { form = formRules[fI].f; break; } }
+    var PET_NAME = { cat: '猫咪', dog: '狗狗', exotic: '异宠', general: '综合' };
+    var track = PET_NAME[pet] + form;
 
     // 2. 原视频开头钩子识别
     var hookRules = [
@@ -465,36 +492,31 @@ App.pages['viral-videos'] = function (root) {
     var emotion = '治愈陪伴';
     for (var e = 0; e < emoRules.length; e++) { if (emoRules[e].keys.some(function (k) { return raw.indexOf(k) > -1; })) { emotion = emoRules[e].e; break; } }
 
-    // 4. 原视频反转 / 视觉 / 文案 / BGM / 标签（参考）
+    // 4. 反转 / 视觉 / 文案 / BGM / 标签（按内容形式驱动）
     var twist = (raw.indexOf('反转') > -1) ? '结尾神反转' : (emotion === '温情共鸣' ? '铺垫→温情反转' : '自然递进收尾');
-    var visual = track === '萌宠穿搭' ? '全身镜多角度+同款特写' : track === '宠物好物' ? '产品摆拍+成分对比' : track === '宠物科普' ? '实拍+字幕讲解' : track === '宠物剧情' ? '固定机位+运镜跟随' : '近距离特写+慢动作抓拍';
+    var visual = form === '穿搭' ? '全身镜多角度+同款特写' : form === '好物' ? '产品摆拍+成分对比' : form === '科普' ? '实拍+字幕讲解' : form === '剧情' ? '固定机位+运镜跟随' : '近距离特写+慢动作抓拍';
     var bgm = emotion === '搞笑娱乐' ? '搞笑音效/卡点BGM' : emotion === '治愈解压' ? '治愈系纯音乐' : emotion === '种草带货' ? '科技感/轻快' : '悬疑转场→温情';
     var tag = '#' + track + ' #萌宠日常 #宠物' + (emotion === '种草带货' ? ' #宠物好物' : '');
 
-    // 5. 原视频分镜框架（参考）
+    // 5. 原视频分镜框架（按内容形式）
     var frameworkMap = {
-      '宠物剧情': [{ t: '0-3s', c: '悬念开头：它（等待/守护）的画面' }, { t: '3-15s', c: '铺垫：起因（捡到/生病/走丢）' }, { t: '15-40s', c: '过程：照顾/陪伴真实记录' }, { t: '40-55s', c: '反转：温情爆点（报恩/康复/认家）' }, { t: '55-60s', c: '结尾：升华+引导关注' }],
-      '宠物科普': [{ t: '0-3s', c: '痛点钩子：你家猫也__？' }, { t: '3-20s', c: '原理：字幕+实拍讲清楚' }, { t: '20-45s', c: '举例：具体表现与应对' }, { t: '45-60s', c: '养宠建议+收藏引导' }],
-      '宠物好物': [{ t: '0-3s', c: '结论先行：别再交智商税' }, { t: '3-20s', c: '横评：红榜/黑榜对比' }, { t: '20-45s', c: '推荐：平价黑马实测' }, { t: '45-60s', c: '购买建议+链接' }],
-      '萌宠穿搭': [{ t: '0-3s', c: '痛点：这样穿太可爱' }, { t: '3-20s', c: '搭配公式：3套风格' }, { t: '20-45s', c: '同款示范：多角度展示' }, { t: '45-60s', c: '清单+购买' }],
-      '猫咪': [{ t: '0-3s', c: '反差钩子：__反应名场面' }, { t: '3-40s', c: '真实记录：抓拍自然反应' }, { t: '40-60s', c: '治愈/搞笑收尾' }],
-      '狗狗': [{ t: '0-3s', c: '钩子：每天__改变' }, { t: '3-40s', c: '跟拍：户外/日常真实' }, { t: '40-60s', c: '效果展示+打卡引导' }],
-      '异宠': [{ t: '0-3s', c: '钩子：小窝还能这样改' }, { t: '3-40s', c: '过程：布置/饲养记录' }, { t: '40-60s', c: '成品展示+种草' }]
+      '剧情': [{ t: '0-3s', c: '悬念开头：它（等待/守护）的画面' }, { t: '3-15s', c: '铺垫：起因（捡到/生病/走丢）' }, { t: '15-40s', c: '过程：照顾/陪伴真实记录' }, { t: '40-55s', c: '反转：温情爆点（报恩/康复/认家）' }, { t: '55-60s', c: '结尾：升华+引导关注' }],
+      '科普': [{ t: '0-3s', c: '痛点钩子：你家猫也__？' }, { t: '3-20s', c: '原理：字幕+实拍讲清楚' }, { t: '20-45s', c: '举例：具体表现与应对' }, { t: '45-60s', c: '养宠建议+收藏引导' }],
+      '好物': [{ t: '0-3s', c: '结论先行：别再交智商税' }, { t: '3-20s', c: '横评：红榜/黑榜对比' }, { t: '20-45s', c: '推荐：平价黑马实测' }, { t: '45-60s', c: '购买建议+链接' }],
+      '穿搭': [{ t: '0-3s', c: '痛点：这样穿太可爱' }, { t: '3-20s', c: '搭配公式：3套风格' }, { t: '20-45s', c: '同款示范：多角度展示' }, { t: '45-60s', c: '清单+购买' }],
+      '日常': [{ t: '0-3s', c: '反差钩子：__反应名场面' }, { t: '3-40s', c: '真实记录：抓拍自然反应' }, { t: '40-60s', c: '治愈/搞笑收尾' }]
     };
-    var framework = frameworkMap[track] || [{ t: '0-3s', c: '强冲击钩子开场' }, { t: '3-40s', c: '真实记录主体内容' }, { t: '40-60s', c: '情绪收尾+引导' }];
+    var framework = frameworkMap[form] || frameworkMap['日常'];
 
     // ===== 给你的猫咪账号：选题 + 重新生成脚本（猫咪专属）=====
     var catTopicMap = {
-      '宠物剧情': '猫咪报恩/守护/走丢被找回的温情剧情——用你自家猫的真实瞬间拍',
-      '宠物科普': '猫咪冷知识/养猫误区（如：猫为什么半夜跑酷、为什么踩奶）',
-      '宠物好物': '平价猫粮/猫砂/猫玩具红黑榜实测（出镜主角换成你家猫）',
-      '萌宠穿搭': '猫咪秋冬毛衣/项圈穿搭（注意猫咪接受度，别强制）',
-      '猫咪': '猫咪反差萌反应名场面（第一次吃__、第一次洗澡）',
-      '狗狗': '把"狗狗"套路换成"猫咪"：同类行为怎么拍更萌',
-      '异宠': '换主角：用猫咪演绎同类治愈/种草剧情',
-      '萌宠日常': '猫咪一天 vlog（清晨醒神 / 午后晒太阳 / 夜晚跑酷）'
+      '剧情': '猫咪报恩/守护/走丢被找回的温情剧情——用你自家猫的真实瞬间拍',
+      '科普': '猫咪冷知识/养猫误区（如：猫为什么半夜跑酷、为什么踩奶）',
+      '好物': '平价猫粮/猫砂/猫玩具红黑榜实测（出镜主角换成你家猫）',
+      '穿搭': '猫咪秋冬毛衣/项圈穿搭（注意猫咪接受度，别强制）',
+      '日常': '猫咪一天 vlog（清晨醒神 / 午后晒太阳 / 夜晚跑酷）'
     };
-    var catTopic = catTopicMap[track] || '猫咪日常反差萌记录（沿用原视频结构，主角换成你家猫）';
+    var catTopic = catTopicMap[form] || catTopicMap['日常'];
 
     var catFramework = [
       { t: '0-3s', c: '钩子：镜头怼猫咪脸，抓它最魔性的表情/动作特写' },
@@ -518,7 +540,7 @@ App.pages['viral-videos'] = function (root) {
     ];
 
     // ④ 可借鉴的「我能做的视频文案」+ 拍摄清单（猫咪专属）
-    var body = (track === '宠物好物' ? '先说坑再上你家猫在用的平价好物，边用边讲' : track === '宠物剧情' ? '从铺垫到温情反转，用你家猫的真实瞬间' : track === '宠物科普' ? '现象→原理→建议，字幕辅助' : track === '萌宠穿搭' ? '搭配公式+同款多角度' : '真实记录你家猫的__反应，抓最自然的瞬间');
+    var body = (form === '好物' ? '先说坑再上你家猫在用的平价好物，边用边讲' : form === '剧情' ? '从铺垫到温情反转，用你家猫的真实瞬间' : form === '科普' ? '现象→原理→建议，字幕辅助' : form === '穿搭' ? '搭配公式+同款多角度' : '真实记录你家猫的__反应，抓最自然的瞬间');
     var actionable = '🐱 你的猫咪账号可直接拍的同款脚本：\n\n'
       + '【0-3s 黄金开头】' + hook.replace(/"/g, '') + '——画面直接放猫咪最萌的表情/动作特写，前3秒不留废话。\n'
       + '【3-40s 内容主体】用「' + emotion + '」情绪串起来：' + body + '。\n'
