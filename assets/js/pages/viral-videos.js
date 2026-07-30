@@ -137,11 +137,14 @@ App.pages['viral-videos'] = function (root) {
   aRow2.appendChild(U.el('button', { class: 'btn', id: 'vvParseBtn', text: '🔍 一键解析', onclick: runAnalyze }));
   aRow2.appendChild(U.el('button', { class: 'btn ghost', text: '手动补充', onclick: function () { aManual.style.display = 'block'; aTitle.focus(); } }));
   aRow2.appendChild(U.el('button', { class: 'btn ghost', text: '打开原视频', onclick: function () { if (aLink.value.trim()) window.open(aLink.value.trim(), '_blank'); else U.toast('请先填写视频链接'); } }));
+  aRow2.appendChild(U.el('button', { class: 'btn', style: 'background:linear-gradient(135deg,#5b8def,#8a5bef);color:#fff;border:none', text: '🫧 豆包解析提示词', onclick: prepareDoubaoPrompt }));
   analyzerCard.appendChild(aRow2);
   var aStatus = U.el('div', { class: 'muted', id: 'vvParseStatus', style: 'margin-top:6px' });
   analyzerCard.appendChild(aStatus);
   var aResult = U.el('div', { id: 'vvAnalyzeResult' });
   analyzerCard.appendChild(aResult);
+  var aDoubao = U.el('div', { id: 'vvDoubaoBox' });
+  analyzerCard.appendChild(aDoubao);
   root.appendChild(analyzerCard);
 
   function runAnalyze() {
@@ -181,6 +184,7 @@ App.pages['viral-videos'] = function (root) {
     U.$('#vvParseBtn').disabled = false;
     if (!title) { U.toast('请填写视频标题'); aTitle.focus(); return; }
     renderAnalysis(parseVideo({ link: link, title: title, desc: desc }), { link: link, title: title, desc: desc });
+    renderDoubaoPrompt(link, title, desc);
   }
 
   function loadLive() {
@@ -608,6 +612,78 @@ App.pages['viral-videos'] = function (root) {
       starred: false, archived: false, tags: [p.track], note: p.actionable, img: '', fileName: ''
     });
     S.saveVideos(v); U.toast('已保存为素材，可在下方素材库查看/收藏'); render();
+  }
+
+  /* ===================== 发给豆包深度解析（不接 API，复制提示词去豆包 App） ===================== */
+  function prepareDoubaoPrompt() {
+    var link = aLink.value.trim();
+    var title = aTitle.value.trim();
+    var desc = aDesc.value.trim();
+    if (!link && !title) { U.toast('请先粘贴链接，或展开「手动补充」填标题'); aLink.focus(); return; }
+    if (link && !title) {
+      U.$('#vvParseStatus').textContent = '正在提取标题用于生成提示词…';
+      fetchVideoMeta(link).then(function (meta) {
+        if (meta && meta.ok && meta.title) { title = meta.title; aTitle.value = title; desc = desc || (meta.desc || ''); aDesc.value = desc; }
+        renderDoubaoPrompt(link, title, desc);
+      }).catch(function () { renderDoubaoPrompt(link, title, desc); });
+    } else {
+      renderDoubaoPrompt(link, title, desc);
+    }
+  }
+  function renderDoubaoPrompt(link, title, desc) {
+    U.clear(aDoubao);
+    var prompt = buildDoubaoPrompt(link, title, desc);
+    var card = U.el('div', { class: 'card', style: 'margin-top:12px;background:var(--surface-2)' });
+    card.appendChild(U.el('div', { class: 'card-title', html: '🫧 发给豆包深度解析 <span class="src-tag">复制后去豆包 App 粘贴 + 发视频</span>' }));
+    card.appendChild(U.el('div', { class: 'muted', style: 'margin-bottom:8px', text: '豆包是字节的多模态模型，能真正「看懂」视频画面。复制下面提示词 → 打开豆包 App → 把视频（或链接）发给它 → 再粘贴这段提示词，它会按结构输出深度拆解。注：豆包视频理解暂不支持音频，若它无法还原口播，请把你听到的台词粘进「我已知的文案」里再发。' }));
+    var ta = U.el('textarea', { class: 'textarea', readonly: true, style: 'width:100%;min-height:200px;font-size:12px;line-height:1.55' });
+    ta.value = prompt;
+    card.appendChild(ta);
+    var row = U.el('div', { class: 'row', style: 'margin-top:8px' });
+    row.appendChild(U.el('button', { class: 'btn sm', text: '📋 复制提示词', onclick: function () { copyText(prompt); U.toast('已复制，去豆包粘贴'); } }));
+    row.appendChild(U.el('button', { class: 'btn ghost sm', text: '📖 使用说明', onclick: showDoubaoGuide }));
+    card.appendChild(row);
+    aDoubao.appendChild(card);
+  }
+  function buildDoubaoPrompt(link, title, desc) {
+    return [
+      '你是一个短视频爆款拆解专家。我发给你一个宠物（抖音/小红书）视频，请帮我深度解析，并严格按下面结构用中文输出：',
+      '',
+      '【原视频信息】',
+      '标题：' + (title || '（请豆包看视频后补全）'),
+      '链接：' + (link || '（无）'),
+      '我已知的文案/字幕：' + (desc || '（无，请豆包看视频尽量还原）'),
+      '',
+      '【请按以下结构输出】',
+      '1. 标题 / 口播文案：尽量逐字还原视频的标题与口播台词。',
+      '2. 选题拆解：这条为什么火？受众是谁？情绪钩子 / 痛点在哪里？',
+      '3. 分镜框架：按时间线（0-3s / 3-15s / 15-40s / 40-60s）拆解画面内容、运镜、景别、转场。',
+      '4. 拍摄手法：机位、光线、剪辑节奏、BGM、字幕 / 花字风格。',
+      '5. 可借鉴点：我能复制的「结构」而不是「内容」——哪些手法可迁移。',
+      '',
+      '【重要背景 · 我是做猫咪宠物账号的】',
+      '请在上面解析之后，额外输出一版【猫咪账号专属】方案：',
+      '- 可拍选题：把主角换成我家猫，保留爆款结构（不要照搬原内容）。',
+      '- 重新生成的口播稿：猫咪视角、口语化、带分镜时间线（0-3s / 3-40s / 40-60s）。',
+      '- 拍摄清单：机位建议、BGM 类型、发布标签（#猫咪 #萌宠日常 等）。',
+      '',
+      '直接输出，不要寒暄。'
+    ].join('\n');
+  }
+  function showDoubaoGuide() {
+    U.modal({
+      title: '用豆包深度解析视频',
+      body: U.el('div', { class: 'muted', html:
+        '1. 在 App 里点「🫧 豆包解析提示词」，复制生成的提示词。<br>' +
+        '2. 打开<strong>豆包 App</strong>（抖音同款字节出品，能看视频）。<br>' +
+        '3. 把你要拆解的视频（或抖音/小红书链接）发给豆包。<br>' +
+        '4. 把复制的提示词粘贴进去发送。<br>' +
+        '5. 豆包会按结构输出：标题/口播 → 选题拆解 → 分镜 → 拍摄手法 → 可借鉴点，并额外给你一版<strong>猫咪账号专属</strong>的选题/口播稿/拍摄清单。<br><br>' +
+        '⚠️ 豆包视频理解暂不支持音频，若它没还原出口播台词，你把自己听到的台词粘进提示词「我已知的文案」再发一次即可。<br><br>' +
+        '拿回结果后，回到我们 App 的「一键解析」里手动补充标题/口播，就能把爆款存进素材库。'
+      }),
+      actions: [{ label: '知道了', primary: true }]
+    });
   }
 
   function copyText(txt) {
