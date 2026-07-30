@@ -71,11 +71,11 @@ App.pages['viral-videos'] = function (root) {
       var fresh = genSample(8);
       v.dailyCollected.items = fresh.concat(v.dailyCollected.items).slice(0, 40);
     } else {
-      // 自动每日采集（5:00）——此处生成示例榜
+      // 自动每日采集（5:00）——生成参考模板榜
       v.dailyCollected = { date: S.todayStr(), items: genSample(12) };
     }
     S.saveVideos(v);
-    U.toast(manual ? '已刷新榜单（示例）' : '已完成每日采集（示例）');
+    if (manual) U.toast('已刷新（参考模板）');
     render();
   }
 
@@ -104,9 +104,53 @@ App.pages['viral-videos'] = function (root) {
   }
 
   /* ---------- 渲染 ---------- */
+  // 实时热榜（真实联网）
+  var liveType = 'douyin';
+  var liveCard = U.el('div', { class: 'card' });
+  liveCard.appendChild(U.el('div', { class: 'card-title', html: '实时热榜选题 <span class="src-tag" id="vvLiveSrc"></span>' }));
+  liveCard.appendChild(U.el('div', { class: 'muted', text: '真实联网抓取抖音/微博热榜，选题灵感直接来自当下热点（非平台原视频，仅供方向参考）。' }));
+  var liveTabs = U.el('div', { class: 'filter-bar', id: 'vvLiveTabs' });
+  [['douyin', '抖音热榜'], ['weibo', '微博热搜']].forEach(function (t) {
+    liveTabs.appendChild(U.el('span', { class: 'tag' + (liveType === t[0] ? ' active' : ''), text: t[1], onclick: function () { liveType = t[0]; U.$all('#vvLiveTabs .tag').forEach(function (x) { x.classList.toggle('active', x.textContent === t[1]); }); loadLive(); } }));
+  });
+  liveCard.appendChild(liveTabs);
+  liveCard.appendChild(U.el('button', { class: 'btn sm', style: 'margin:10px 0', text: '🔄 刷新实时热榜', onclick: loadLive }));
+  var liveBox = U.el('div', { id: 'vvLiveBox' });
+  liveCard.appendChild(liveBox);
+  root.appendChild(liveCard);
+
+  function loadLive() {
+    U.$('#vvLiveSrc').innerHTML = '<span class="live-dot wait"></span> 抓取中…';
+    U.clear(liveBox); liveBox.appendChild(U.el('div', { class: 'muted', text: '联网抓取中…' }));
+    U.fetchTrending(liveType, 9000).then(function (res) {
+      if (!res.ok || !res.items.length) {
+        U.$('#vvLiveSrc').innerHTML = '<span class="live-dot off"></span> 暂未获取';
+        U.clear(liveBox);
+        liveBox.appendChild(U.el('div', { class: 'empty', text: '实时热榜获取失败。若部署在 github.io 受跨域限制，建议部署到 Cloudflare Pages 启用服务端联网；或稍后刷新。' }));
+        return;
+      }
+      U.$('#vvLiveSrc').innerHTML = '<span class="live-dot on"></span> 实时 · ' + res.items.length + ' 条';
+      U.clear(liveBox);
+      res.items.slice(0, 30).forEach(function (x) {
+        var row = U.el('div', { class: 'quote-row' });
+        row.appendChild(U.el('div', {}, [U.el('div', { text: x.title }), U.el('div', { class: 'muted', text: '热度 ' + (x.hot ? (x.hot / 10000).toFixed(1) + 'w' : '—') })]));
+        var right = U.el('div', { style: 'display:flex;gap:6px' });
+        if (x.url) right.appendChild(U.el('button', { class: 'btn ghost xs', text: '看原帖', onclick: function () { window.open(x.url, '_blank'); } }));
+        right.appendChild(U.el('button', { class: 'btn ghost xs', text: '记灵感', onclick: function () { saveInspiration(x.title); } }));
+        row.appendChild(right);
+        liveBox.appendChild(row);
+      });
+    });
+  }
+  function saveInspiration(text) {
+    var arr = S.getInspirations() || [];
+    arr.unshift({ id: U.uid(), date: S.todayStr(), time: U.fmtTime(), content: text, tags: ['实时热榜'], pinned: false, starred: false, attachments: [] });
+    S.saveInspirations(arr); U.toast('已记入灵感');
+  }
+
   // 顶部操作条
   var opCard = U.el('div', { class: 'card' });
-  opCard.appendChild(U.el('div', { class: 'card-title', html: '爆款素材库 <span class="demo-badge">示例榜单</span>' }));
+  opCard.appendChild(U.el('div', { class: 'card-title', html: '爆款素材库 <span class="demo-badge">参考模板</span>' }));
   var opRow = U.el('div', { class: 'row wrap' });
   opRow.appendChild(U.el('button', { class: 'btn sm', text: '一键刷新榜单', onclick: function () { collect(true); } }));
   opRow.appendChild(U.el('button', { class: 'btn ghost sm', text: '手动新增素材', onclick: openManual }));
@@ -311,4 +355,5 @@ App.pages['viral-videos'] = function (root) {
 
   ensureCollected();
   render();
+  loadLive();
 };

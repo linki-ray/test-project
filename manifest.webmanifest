@@ -1,0 +1,17 @@
+{
+  "name": "宠物运营工作台",
+  "short_name": "工作台",
+  "description": "宠物自媒体博主专属：每日计划、爆款选题、灵感记录、金融热点、打卡计划，跨设备云端同步。",
+  "lang": "zh-CN",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef1f8",
+  "theme_color": "#4a63e8",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

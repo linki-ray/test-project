@@ -203,10 +203,16 @@ App.pages['pet-ops'] = function (root) {
     function loadHot() {
       U.$('#hotSrc').innerHTML = '<span class="live-dot wait"></span> 抓取中…';
       U.clear(listBox); listBox.appendChild(U.el('div', { class: 'muted', text: '联网抓取中…' }));
-      U.fetchJSON('https://api.vvhan.com/api/hotlist/wbHot', 9000)
-        .then(function (j) {
-          var arr = parseHot(j);
+      U.fetchTrending('weibo', 9000)
+        .then(function (res) {
+          var arr = res.items || [];
           var pet = arr.filter(function (x) { return isPet(x.title); });
+          if (!res.ok || !arr.length) {
+            U.$('#hotSrc').innerHTML = '<span class="live-dot off"></span> 暂未获取到';
+            U.clear(listBox);
+            listBox.appendChild(U.el('div', { class: 'empty', text: '联网获取失败。若部署在 github.io 受跨域限制，建议部署到 Cloudflare Pages 以启用服务端联网数据；或手动在下方添加。' }));
+            return;
+          }
           if (!pet.length) { U.$('#hotSrc').innerHTML = '<span class="live-dot on"></span> 实时'; U.clear(listBox); listBox.appendChild(U.el('div', { class: 'empty', text: '当前热榜无宠物相关话题，稍后刷新或手动添加' })); return; }
           U.$('#hotSrc').innerHTML = '<span class="live-dot on"></span> 实时 · 共 ' + pet.length + ' 条';
           U.clear(listBox);
@@ -219,11 +225,6 @@ App.pages['pet-ops'] = function (root) {
             row.appendChild(right);
             listBox.appendChild(row);
           });
-        })
-        .catch(function () {
-          U.$('#hotSrc').innerHTML = '<span class="live-dot off"></span> 获取失败';
-          U.clear(listBox);
-          listBox.appendChild(U.el('div', { class: 'empty', text: '联网获取失败（接口受限或网络问题）。可手动在下方「我的选题池」添加，或稍后点刷新重试。' }));
         });
     }
     loadHot();

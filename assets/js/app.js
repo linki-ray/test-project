@@ -137,6 +137,8 @@
     showLogin(false);
     updateSyncPill('syncing');
     try {
+      // 先刷新 token，延长登录有效期（避免 1 小时过期）
+      if (App.Sync.refresh) { try { await App.Sync.refresh(); } catch (e) {} }
       var map = await App.Sync.pullAll();
       App.Store.applyRemote(map);
       App.Sync.seedVersions(map);
@@ -153,6 +155,15 @@
     App.Sync.setStatusCb(updateSyncPill);
     if (App.Sync.loadSession() && App.Sync.isLoggedIn()) { onLoggedIn(); }
     else { showLogin(true); }
+  }
+
+  // 注册 Service Worker（PWA：可添加到主屏幕 + 离线缓存 + 登录态持久）
+  function registerSW() {
+    if (!('serviceWorker' in navigator)) return;
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return;
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
   }
 
   // 登录表单
@@ -215,6 +226,7 @@
   navigate('daily-plan');
   scheduleReminders();
   initSync();
+  registerSW();
   // 启动后若已过 5:00 且今日未采集，立即补采
   (function () { var hhmm = U.fmtTime(new Date()); if (hhmm >= '05:00' && App._videoAutoCollect) App._videoAutoCollect(); })();
 })();

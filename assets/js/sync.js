@@ -76,6 +76,21 @@ App.Sync = (function () {
 
   function logout() { clearSession(); stopPolling(); emit('offline'); }
 
+  // 刷新 access_token（避免 1 小时过期后被迫重登）
+  async function refresh() {
+    if (!session || !session.refresh_token) return false;
+    try {
+      var r = await req('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: JSON.stringify({ refresh_token: session.refresh_token }) });
+      var j = await parse(r);
+      if (r.ok && j.access_token) {
+        session = { access_token: j.access_token, refresh_token: j.refresh_token || session.refresh_token, user: j.user || session.user };
+        saveSession();
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
   /* ---------- 数据拉取 ---------- */
   // 返回 { bucket: {value, updated_at} }
   async function pullAll() {
@@ -149,7 +164,7 @@ App.Sync = (function () {
     ENABLED: ENABLED, URL: URL, KEY: KEY,
     loadSession: loadSession, isLoggedIn: isLoggedIn, userId: userId,
     signUp: signUp, signIn: signIn, logout: logout,
-    pullAll: pullAll, pushBucket: pushBucket, deleteBucket: deleteBucket,
+    pullAll: pullAll, pushBucket: pushBucket, deleteBucket: deleteBucket, refresh: refresh,
     startPolling: startPolling, stopPolling: stopPolling, seedVersions: seedVersions,
     setStatusCb: setStatusCb, getStatus: function () { return lastStatus; },
     getSession: function () { return session; }

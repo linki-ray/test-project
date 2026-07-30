@@ -137,12 +137,57 @@ App.U = (function () {
     });
   }
 
+  /* ---- 统一联网热榜取数（真实数据） ----
+     type: douyin | weibo | zhihu | baidu
+     优先走 Cloudflare Pages 函数 /api/trending（服务端抓取，规避跨域/网络限制）；
+     失败则直连公开接口兜底；均失败返回 { ok:false }。
+     返回 { ok, items:[{title,hot,url}], source, live } */
+  function normalizeHot(j) {
+    if (!j) return [];
+    var list = j;
+    if (j.items && Array.isArray(j.items)) return j.items;
+    if (j.data) list = j.data;
+    if (list && list.data && Array.isArray(list.data)) list = list.data;
+    if (list && list.list && Array.isArray(list.list)) list = list.list;
+    if (list && list.result && Array.isArray(list.result)) list = list.result;
+    if (!Array.isArray(list)) return [];
+    return list.map(function (x) {
+      if (x && typeof x === 'object' && (x.title || x.word || x.name || x.query)) {
+        return { title: x.title || x.word || x.name || x.query || '', hot: x.hot || x.num || x.score || x.heat || 0, url: x.url || x.mblink || x.link || x.mobileUrl || '' };
+      }
+      return null;
+    }).filter(function (x) { return x && x.title; });
+  }
+  var DIRECT = {
+    douyin: ['https://api.pearktrue.cn/api/douyinhot/', 'https://api.oioweb.cn/api/common/HotList?type=douyin'],
+    weibo: ['https://api.oioweb.cn/api/common/HotList?type=weibo', 'https://tenapi.cn/v2/weibohot', 'https://api.vvhan.com/api/hotlist/wbHot'],
+    zhihu: ['https://api.oioweb.cn/api/common/HotList?type=zhihu'],
+    baidu: ['https://api.oioweb.cn/api/common/HotList?type=baidu']
+  };
+  function fetchTrending(type, ms) {
+    type = type || 'douyin';
+    var cfg = (window.APP_CONFIG && window.APP_CONFIG.TRENDING_API) || '';
+    var attempts = [];
+    if (cfg) attempts.push({ url: cfg + (cfg.indexOf('?') > -1 ? '&' : '?') + 'type=' + type, source: 'server', live: true });
+    (DIRECT[type] || []).forEach(function (u) { attempts.push({ url: u, source: 'direct', live: true }); });
+    function tryOne(i) {
+      if (i >= attempts.length) return Promise.resolve({ ok: false, items: [], source: null, live: false });
+      var a = attempts[i];
+      return fetchJSON(a.url, ms || 9000).then(function (j) {
+        var items = normalizeHot(j);
+        if (items.length) return { ok: true, items: items, source: a.source, live: true };
+        return tryOne(i + 1);
+      }).catch(function () { return tryOne(i + 1); });
+    }
+    return tryOne(0);
+  }
+
   return {
     el: el, $: $, $all: $all, clear: clear, uid: uid,
     fmtDate: fmtDate, fmtTime: fmtTime, esc: esc,
     toast: toast, notify: notify, modal: modal,
     download: download, exportJSON: exportJSON,
     scheduleCheck: scheduleCheck, clearTimers: clearTimers, requestNotifyPermission: requestNotifyPermission,
-    fetchJSON: fetchJSON
+    fetchJSON: fetchJSON, fetchTrending: fetchTrending, normalizeHot: normalizeHot
   };
 })();
