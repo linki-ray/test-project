@@ -564,7 +564,9 @@ App.pages = App.pages || {};
       row.appendChild(U.el('button', { class: 'btn', text: '保存并拉取书架', onclick: function () {
         var v = input.value.trim();
         if (!v) { U.toast('请输入 Key'); return; }
-        setWereadKey(v); loadWereadShelf(root, wrap);
+        setWereadKey(v);
+        // 重新渲染页面：绑定后进入「已绑定」分支，自动生成书架容器并拉取
+        renderLibrary(root);
       } }));
       row.appendChild(U.el('button', { class: 'btn ghost', text: 'Key 怎么获取？', onclick: showWereadHelp }));
       card.appendChild(input);
