@@ -617,25 +617,34 @@ App.pages = App.pages || {};
       if (!items.length) { box.appendChild(U.el('div', { class: 'empty', text: '书架为空' })); return; }
       var grid = U.el('div', { class: 'grid c2' });
       items.forEach(function (it) {
-        var c = U.el('div', { class: 'weread-book', onclick: function () { openWeread(it.id); } });
+        var c = U.el('div', { class: 'weread-book', onclick: function () { openWereadWeb(it.id); } });
         c.appendChild(U.el('img', { class: 'weread-cover', src: it.cover || '', onerror: function () { this.style.visibility = 'hidden'; } }));
         var meta = U.el('div', { class: 'weread-meta' });
         meta.appendChild(U.el('div', { class: 'weread-title', text: it.title || '未命名' }));
         meta.appendChild(U.el('div', { class: 'muted', style: 'font-size:12px', text: (it.author || '') + (it.type === 'album' ? ' · 有声书' : '') }));
         c.appendChild(meta);
-        c.appendChild(U.el('button', { class: 'btn xs', text: '打开', onclick: function (e) { e.stopPropagation(); openWeread(it.id); } }));
+        var acts = U.el('div', { class: 'weread-actions' });
+        acts.appendChild(U.el('button', { class: 'btn xs primary', text: '网页阅读', onclick: function (e) { e.stopPropagation(); openWereadWeb(it.id); } }));
+        acts.appendChild(U.el('button', { class: 'btn xs', text: 'App', onclick: function (e) { e.stopPropagation(); openWereadApp(it.id); } }));
+        c.appendChild(acts);
         grid.appendChild(c);
       });
       box.appendChild(grid);
-      box.appendChild(U.el('div', { class: 'muted', style: 'margin-top:8px;font-size:12px', text: '点「打开」跳微信读书 App 续读（需在装了微信读书的手机上点击）' }));
+      box.appendChild(U.el('div', { class: 'muted', style: 'margin-top:8px;font-size:12px', text: '「网页阅读」在任意浏览器打开微信读书网页版（无需 App，微信扫码登录即可读）；「App」仅尝试用手机唤起已安装的微信读书 App 续读。' }));
     }).catch(function (e) {
       U.clear(box);
       box.appendChild(U.el('div', { class: 'empty', text: '网络错误：' + (e && e.message ? e.message : e) }));
     });
   }
 
-  function openWeread(bookId) {
-    // 用隐藏 iframe 尝试唤起微信读书 App（避免在桌面端导航走丢页面）
+  function openWereadWeb(bookId) {
+    // 网页版：任意浏览器可用，无需安装 App（微信扫码登录即可读）
+    var url = 'https://weread.qq.com/web/bookDetail/' + encodeURIComponent(bookId);
+    window.open(url, '_blank');
+  }
+
+  function openWereadApp(bookId) {
+    // 仅装了微信读书 App 的手机可唤起
     var url = 'weread://reading?bId=' + bookId;
     try {
       var ifr = document.createElement('iframe');
@@ -644,7 +653,7 @@ App.pages = App.pages || {};
       document.body.appendChild(ifr);
       setTimeout(function () { if (ifr.parentNode) ifr.parentNode.removeChild(ifr); }, 1500);
     } catch (e) {}
-    U.toast('已尝试唤起微信读书（请在手机上点击打开）');
+    U.toast('已尝试唤起微信读书 App（请在手机上点击打开）');
   }
 
   function showWereadHelp() {
@@ -657,7 +666,7 @@ App.pages = App.pages || {};
           U.el('li', { text: '浏览器打开 weread.qq.com/r/weread-skills（需登录态）。' }),
           U.el('li', { text: '按页面提示「启用 / 安装 skill」，复制形如 wrk-xxxxxxxx 的 API Key。' })
         ]),
-        U.el('p', { class: 'muted', style: 'margin-top:10px;font-size:12px', text: '说明：该 Key 绑定你的微信读书账号，仅用于拉取书架与进度，不能读取书籍正文（受 DRM 保护）。正文仍在微信读书 App 内阅读，点「打开」会跳回 App 续读。Key 仅存于本机浏览器，不会上传或写进代码。' })
+        U.el('p', { class: 'muted', style: 'margin-top:10px;font-size:12px', text: '说明：该 Key 绑定你的微信读书账号，仅用于拉取书架与进度，不能读取书籍正文（受 DRM 保护）。点「网页阅读」会在任意浏览器打开微信读书网页版（微信扫码登录即可读，无需 App）；点「App」则尝试唤起已安装的微信读书 App 续读。Key 仅存于本机浏览器，不会上传或写进代码。' })
       ])
     });
   }
