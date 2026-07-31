@@ -21,5 +21,8 @@ window.APP_CONFIG = {
   // 抖音/小红书会限制外链抓取，失败时前端会引导手动补充或把链接发我（对话里）深度解析。
   FETCH_VIDEO_API: 'https://test-project-ek2.pages.dev/api/fetch-video',
   // 市场资讯接口：由 Cloudflare Pages 服务端函数 /api/news 代理新浪财经全球财经快讯（绕开浏览器跨域）。
-  NEWS_API: 'https://test-project-ek2.pages.dev/api/news'
+  NEWS_API: 'https://test-project-ek2.pages.dev/api/news',
+  // 链接解析接口：由 Cloudflare Pages 服务端函数 /api/parse-link 代理抓取小红书/抖音分享链接，
+  // 提取标题/正文/封面（文字稳、视频流拿不到、图片可能过期）。
+  PARSE_API: 'https://test-project-ek2.pages.dev/api/parse-link'
 };

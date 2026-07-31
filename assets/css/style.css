@@ -30,6 +30,8 @@
   --nav-purple-soft: #f2efff;
   --nav-teal: #1db5bd;
   --nav-teal-soft: #e3fafa;
+  --nav-orange: #f5871f;
+  --nav-orange-soft: #fff3e6;
 
   /* 涨跌 */
   --red: #ef4848;
@@ -105,6 +107,7 @@ body {
 .nav-item[data-color="green"] .nav-ico-wrap { color: var(--nav-green); background: var(--nav-green-soft); }
 .nav-item[data-color="purple"] .nav-ico-wrap { color: var(--nav-purple); background: var(--nav-purple-soft); }
 .nav-item[data-color="teal"] .nav-ico-wrap { color: var(--nav-teal); background: var(--nav-teal-soft); }
+.nav-item[data-color="orange"] .nav-ico-wrap { color: var(--nav-orange); background: var(--nav-orange-soft); }
 
 .nav-item.active {
   background: var(--surface-2); color: var(--text); font-weight: 700;
@@ -118,6 +121,7 @@ body {
 .nav-item.active[data-color="green"] { box-shadow: inset 3px 0 0 var(--nav-green); }
 .nav-item.active[data-color="purple"] { box-shadow: inset 3px 0 0 var(--nav-purple); }
 .nav-item.active[data-color="teal"] { box-shadow: inset 3px 0 0 var(--nav-teal); }
+.nav-item.active[data-color="orange"] { box-shadow: inset 3px 0 0 var(--nav-orange); }
 
 .nav-settings {
   display: flex; align-items: center; gap: 11px;
@@ -323,6 +327,20 @@ body {
 }
 .toc-item:hover { background: var(--surface-2); color: var(--brand); }
 .toc-item:last-child { border-bottom: none; }
+
+/* ---------- 今日菜谱 ---------- */
+.dish-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  overflow: hidden; cursor: pointer; transition: .15s; display: flex; flex-direction: column;
+}
+.dish-card:hover { box-shadow: 0 6px 18px rgba(31,36,48,.08); transform: translateY(-2px); border-color: var(--nav-orange); }
+.dish-img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; background: var(--surface-3); display: block; }
+.dish-info { padding: 10px 12px; }
+.dish-name { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+.dish-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+.tag.xs { padding: 2px 8px; font-size: 11px; border-radius: 999px; cursor: default; }
+.import-preview { border: 1px dashed var(--line); border-radius: var(--radius-sm); padding: 12px; background: var(--surface-2); }
+
 
 
 /* 筛选栏 */
