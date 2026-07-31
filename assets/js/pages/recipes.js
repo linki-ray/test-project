@@ -12,6 +12,7 @@ App.pages = App.pages || {};
 (function () {
   var U = App.U, S = App.Store;
   var API = (window.APP_CONFIG && window.APP_CONFIG.PARSE_API) || 'https://test-project-ek2.pages.dev/api/parse-link';
+  var DISH_API = 'https://test-project-ek2.pages.dev/api/dish-search';
 
   /* ---------- 分类体系（下拉用，type 复用其中 id） ---------- */
   var CATS = [
@@ -108,23 +109,16 @@ App.pages = App.pages || {};
   }
   var RECIPES = buildAllDishes();
 
-  /* 并入 菜单.docx 补充数据集（泰餐/西餐/川菜/湘菜/东北菜/烘焙） */
+  /* 并入 菜单.docx 精选数据集（50 道日常热门）；文档优先去重：同名删内置版 */
   (function () {
     var extra = window.__EXTRA_RECIPES__ || [];
-    var seen = {};
-    RECIPES.forEach(function (d) { seen[d.id] = 1; });
+    var byName = {};
+    RECIPES.forEach(function (d) { byName[d.name] = d; });
     extra.forEach(function (d) {
-      if (seen[d.id]) {
-        // 同名碰撞：把文档版的菜系/标签合并进内置版，避免丢失分类
-        for (var i = 0; i < RECIPES.length; i++) {
-          if (RECIPES[i].id === d.id) {
-            d.cats.forEach(function (c) { if (RECIPES[i].cats.indexOf(c) < 0) RECIPES[i].cats.push(c); });
-            break;
-          }
-        }
-        return;
+      if (byName[d.name]) {
+        var idx = RECIPES.indexOf(byName[d.name]);
+        if (idx > -1) RECIPES.splice(idx, 1); // 删内置同名，文档版优先
       }
-      seen[d.id] = 1;
       d.ingredients = ingFor(d.name, d.type);
       d.steps = stepsFor(d.name, d.type);
       RECIPES.push(d);
@@ -216,33 +210,90 @@ App.pages = App.pages || {};
     function addPreselect(id) { var a = getPreselect(); if (a.indexOf(id) > -1) return false; a.push(id); setPreselect(a); return true; }
     function removePre(id) { setPreselect(getPreselect().filter(function (x) { return x !== id; })); }
 
-    // 通用转盘构造
+    // 通用转盘构造（当前批 K 道 + 刷新换批 + 预选补位；转动与扇区对齐）
     function makeWheel(type, label, hue) {
       var pool = RECIPES.filter(function (d) { return d.type === type; });
+      var K = pool.length ? Math.min(12, Math.max(6, pool.length)) : 0;
       var sub = U.el('div', { style: 'border-top:1px solid var(--line);padding-top:12px;margin-top:12px' });
-      var titleEl = U.el('div', { class: 'card-sub', text: label + '（池中 ' + pool.length + ' 道 · 已抽 ' + countSelected(pool) + '）' });
+      var titleEl = U.el('div', { class: 'card-sub' });
       sub.appendChild(titleEl);
       var wrap = U.el('div', { style: 'display:flex;flex-direction:column;align-items:center;gap:10px' });
       var box = U.el('div', { style: 'position:relative;width:200px;height:200px' });
-      box.innerHTML = buildWheelSVG(pool, hue);
       wrap.appendChild(box);
-      var rotG = box.querySelector('.wheelRot');
-      if (rotG) { rotG.style.transformBox = 'view-box'; rotG.style.transformOrigin = '100px 100px'; }
       var resultBox = U.el('div', { style: 'min-height:18px;text-align:center' });
       wrap.appendChild(resultBox);
-      var spinBtn = U.el('button', { class: 'btn sm', text: '开始转动', onclick: function () { spin(); } });
-      wrap.appendChild(spinBtn);
+      var spinBtn = U.el('button', { class: 'btn sm', text: '🎯 开始转动', onclick: function () { spin(); } });
+      var refreshBtn = U.el('button', { class: 'btn ghost sm', text: '🔄 换一批', onclick: function () { refresh(); } });
+      var btnRow = U.el('div', { class: 'row' });
+      btnRow.appendChild(spinBtn); btnRow.appendChild(refreshBtn);
+      wrap.appendChild(btnRow);
       var preList = U.el('div', { class: 'row wrap', style: 'margin-top:6px;justify-content:center' });
       wrap.appendChild(preList);
       sub.appendChild(wrap);
       wheelCard.appendChild(sub);
 
-      var wheelRot = 0, spinning = false;
-      function avail() { var sel = getPreselect(); return pool.filter(function (d) { return sel.indexOf(d.id) < 0; }); }
+      var rotG = null, wheelRot = 0, spinning = false, currentBatch = [];
+      function sample(arr, n) {
+        var a = arr.slice();
+        for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
+        return a.slice(0, n);
+      }
+      function availAll() { var sel = getPreselect(); return pool.filter(function (d) { return sel.indexOf(d.id) < 0; }); }
+      function renderWheel() {
+        box.innerHTML = buildWheelSVG(currentBatch, hue);
+        rotG = box.querySelector('.wheelRot');
+        if (rotG) { rotG.style.transformBox = 'view-box'; rotG.style.transformOrigin = '100px 100px'; rotG.style.transform = 'rotate(' + wheelRot + 'deg)'; }
+      }
+      function updateTitle() {
+        titleEl.textContent = label + '（本批 ' + currentBatch.length + ' / 池 ' + pool.length + ' · 已抽 ' + countSelected(pool) + '）';
+      }
+      function pickBatch(exclude) {
+        var a = availAll();
+        var ex = exclude || [];
+        var fresh = a.filter(function (d) { return ex.indexOf(d.id) < 0; });
+        var src = fresh.length >= K ? fresh : a;
+        currentBatch = sample(src, Math.min(K, src.length));
+        wheelRot = 0;
+        renderWheel(); updateTitle();
+      }
+      function spin() {
+        if (spinning) return;
+        if (!currentBatch.length) { U.toast(label + ' 暂无可选，点「换一批」'); return; }
+        spinning = true;
+        var N = currentBatch.length, step = 360 / N, idx = Math.floor(Math.random() * N);
+        var desired = (360 - (idx * step + step / 2)) % 360;
+        var curMod = ((wheelRot % 360) + 360) % 360;
+        var delta = (desired - curMod + 360) % 360;
+        wheelRot += 360 * 5 + delta;
+        if (rotG) { rotG.style.transition = 'transform 4s cubic-bezier(.17,.67,.3,1.15)'; rotG.style.transform = 'rotate(' + wheelRot + 'deg)'; }
+        U.clear(resultBox); resultBox.appendChild(U.el('div', { class: 'muted', text: '转动中…' }));
+        setTimeout(function () {
+          spinning = false;
+          var d = currentBatch[idx];
+          U.clear(resultBox);
+          var line = U.el('div', { style: 'font-weight:800;font-size:16px' });
+          line.appendChild(U.el('span', { text: '转到：' }));
+          line.appendChild(U.el('span', { style: 'color:var(--brand)', text: d.name }));
+          resultBox.appendChild(line);
+          resultBox.appendChild(U.el('button', { class: 'btn sm', style: 'margin-top:6px', text: '✓ 预选此菜', onclick: function () {
+            if (addPreselect(d.id)) { U.toast('已预选：' + d.name); } else { U.toast('已在预选中'); }
+            var cur = currentBatch.filter(function (x) { return x.id !== d.id; });
+            var more = availAll().filter(function (x) { return cur.indexOf(x) < 0 && currentBatch.indexOf(x) < 0; });
+            currentBatch = cur.concat(sample(more, 1));
+            renderWheel(); updateTitle();
+            renderGlobalPre(); refreshCounts();
+          } }));
+        }, 4100);
+      }
+      function refresh() {
+        var cur = currentBatch.map(function (d) { return d.id; });
+        pickBatch(cur);
+        U.toast(label + ' 已换新一批');
+      }
       function renderPre() {
         U.clear(preList);
         var sel = getPreselect();
-        titleEl.textContent = label + '（池中 ' + pool.length + ' 道 · 已抽 ' + countSelected(pool) + '）';
+        updateTitle();
         var any = false;
         pool.forEach(function (d) {
           if (sel.indexOf(d.id) > -1) {
@@ -252,34 +303,8 @@ App.pages = App.pages || {};
         });
         if (!any) preList.appendChild(U.el('span', { class: 'muted', text: '（尚未预选）' }));
       }
-      function spin() {
-        if (spinning) return;
-        var a = avail();
-        if (!a.length) { U.toast(label + ' 已抽完，可移除部分再抽'); spinning = false; return; }
-        spinning = true;
-        var N = a.length, step = 360 / N, idx = Math.floor(Math.random() * N);
-        var desired = (360 - (idx * step + step / 2)) % 360;
-        var curMod = ((wheelRot % 360) + 360) % 360;
-        var delta = (desired - curMod + 360) % 360;
-        wheelRot += 360 * 5 + delta;
-        rotG.style.transition = 'transform 4s cubic-bezier(.17,.67,.3,1.15)';
-        rotG.style.transform = 'rotate(' + wheelRot + 'deg)';
-        U.clear(resultBox); resultBox.appendChild(U.el('div', { class: 'muted', text: '转动中…' }));
-        setTimeout(function () {
-          spinning = false;
-          var d = a[idx];
-          U.clear(resultBox);
-          var line = U.el('div', { style: 'font-weight:800;font-size:16px' });
-          line.appendChild(U.el('span', { text: '转到：' }));
-          line.appendChild(U.el('span', { style: 'color:var(--brand)', text: d.name }));
-          resultBox.appendChild(line);
-          resultBox.appendChild(U.el('button', { class: 'btn sm', style: 'margin-top:6px', text: '✓ 预选此菜', onclick: function () {
-            if (addPreselect(d.id)) { U.toast('已预选：' + d.name); } else { U.toast('已在预选中'); }
-            renderPre(); renderGlobalPre(); refreshCounts();
-          } }));
-        }, 4100);
-      }
       renderPre();
+      pickBatch();
       return { pool: pool, renderPre: renderPre };
     }
     function countSelected(pool) { var sel = getPreselect(); return pool.filter(function (d) { return sel.indexOf(d.id) > -1; }).length; }
@@ -289,9 +314,7 @@ App.pages = App.pages || {};
       makeWheel('soup', '🍲 汤转盘', 35)
     ];
     function refreshCounts() {
-      wheels.forEach(function (w) {
-        // 更新每个转盘标题里的“已抽”数
-      });
+      wheels.forEach(function (w) { w.renderPre(); }); // 重绘各转盘标题里的“已抽”数
     }
     wheelSection.appendChild(wheelCard);
 
@@ -334,6 +357,12 @@ App.pages = App.pages || {};
     root.appendChild(impCard);
 
     /* ---------- 渲染函数 ---------- */
+    function loadReal(name) {
+      try { return S.get('dish_real_' + name) || null; } catch (e) { return null; }
+    }
+    function saveReal(name, data) {
+      try { S.set('dish_real_' + name, data); } catch (e) {}
+    }
     function renderGrid(catId, gridEl) {
       U.clear(gridEl);
       var list = RECIPES.concat(getImported());
@@ -357,16 +386,53 @@ App.pages = App.pages || {};
       var tags = U.el('div', { class: 'row wrap', style: 'margin-bottom:8px' });
       dishTags(d).forEach(function (t) { tags.appendChild(U.el('span', { class: 'tag xs', text: t })); });
       body.appendChild(tags);
-      if (d.ingredients && d.ingredients.length) {
-        body.appendChild(U.el('div', { class: 'card-sub', style: 'margin:6px 0 4px', text: '🥬 食材' }));
-        body.appendChild(U.el('div', { text: d.ingredients.join('、') }));
+
+      var real = loadReal(d.name);
+      var methodBox = U.el('div');
+      body.appendChild(methodBox);
+      function renderMethod(data) {
+        U.clear(methodBox);
+        var ing = (data && data.ingredients && data.ingredients.length) ? data.ingredients : d.ingredients;
+        var st = (data && data.steps && data.steps.length) ? data.steps : d.steps;
+        var txt = (data && data.text) ? data.text : d.text;
+        if (ing && ing.length) {
+          methodBox.appendChild(U.el('div', { class: 'card-sub', style: 'margin:6px 0 4px', text: '🥬 食材' }));
+          methodBox.appendChild(U.el('div', { text: ing.join('、') }));
+        }
+        if (st && st.length) {
+          methodBox.appendChild(U.el('div', { class: 'card-sub', style: 'margin:10px 0 4px', text: '👩‍🍳 做法' }));
+          st.forEach(function (s, i) { methodBox.appendChild(U.el('div', { style: 'margin:4px 0', text: (i + 1) + '. ' + s })); });
+        } else if (txt) {
+          methodBox.appendChild(U.el('div', { class: 'card-sub', style: 'margin:10px 0 4px', text: '📝 原文' }));
+          methodBox.appendChild(U.el('div', { style: 'white-space:pre-wrap;line-height:1.6', text: txt }));
+        }
       }
-      if (d.steps && d.steps.length) {
-        body.appendChild(U.el('div', { class: 'card-sub', style: 'margin:10px 0 4px', text: '👩‍🍳 做法' }));
-        d.steps.forEach(function (s, i) { body.appendChild(U.el('div', { style: 'margin:4px 0', text: (i + 1) + '. ' + s })); });
-      } else if (d.text) {
-        body.appendChild(U.el('div', { class: 'card-sub', style: 'margin:10px 0 4px', text: '📝 原文' }));
-        body.appendChild(U.el('div', { style: 'white-space:pre-wrap;line-height:1.6', text: d.text }));
+      renderMethod(real);
+
+      if (!real) {
+        var fetchBtn = U.el('button', { class: 'btn sm', style: 'margin-top:10px', text: '🔍 联网获取真实做法（下厨房）' });
+        fetchBtn.onclick = function () {
+          fetchBtn.textContent = '⏳ 搜索中…'; fetchBtn.disabled = true;
+          fetch(DISH_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: d.name }) })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+              if (res && res.ok && ((res.ingredients && res.ingredients.length) || (res.steps && res.steps.length))) {
+                saveReal(d.name, { ingredients: res.ingredients || [], steps: res.steps || [] });
+                d.real = true; d.ingredients = res.ingredients || d.ingredients; d.steps = res.steps || d.steps;
+                renderMethod(res);
+                if (fetchBtn.parentNode) fetchBtn.parentNode.removeChild(fetchBtn);
+                U.toast('已获取真实做法');
+              } else {
+                fetchBtn.textContent = '🔍 联网获取真实做法（下厨房）'; fetchBtn.disabled = false;
+                U.toast('联网失败：' + ((res && res.error) || '未找到做法') + '，已显示通用做法');
+              }
+            })
+            .catch(function (e) {
+              fetchBtn.textContent = '🔍 联网获取真实做法（下厨房）'; fetchBtn.disabled = false;
+              U.toast('联网失败：' + (e && e.message ? e.message : e) + '，已显示通用做法');
+            });
+        };
+        body.appendChild(fetchBtn);
       }
       if (d.video) body.appendChild(U.el('a', { class: 'btn sm', style: 'margin-top:12px;display:inline-block;text-decoration:none', href: d.video, target: '_blank', rel: 'noopener', text: '▶ 看视频' }));
       U.modal({
@@ -394,13 +460,17 @@ App.pages = App.pages || {};
         if (!list.length) return;
         body.appendChild(U.el('div', { style: 'font-weight:800;font-size:15px;margin:14px 0 6px;border-top:1px solid var(--line);padding-top:10px', text: g[1] + '（' + list.length + '）' }));
         list.forEach(function (d, i) {
+          var real = loadReal(d.name);
+          var ing = (real && real.ingredients && real.ingredients.length) ? real.ingredients : d.ingredients;
+          var st = (real && real.steps && real.steps.length) ? real.steps : d.steps;
+          var txt = (real && real.text) ? real.text : d.text;
           body.appendChild(U.el('div', { style: 'font-weight:700;font-size:14px;margin:8px 0 4px', text: (i + 1) + '. ' + d.name }));
           if (d.image) body.appendChild(U.el('img', { src: d.image, style: 'width:100%;border-radius:10px;margin-bottom:8px;background:var(--surface-3)' }));
-          if (d.ingredients && d.ingredients.length) body.appendChild(U.el('div', { class: 'muted', style: 'font-size:13px', text: '食材：' + d.ingredients.join('、') }));
-          if (d.steps && d.steps.length) {
-            d.steps.forEach(function (s, k) { body.appendChild(U.el('div', { style: 'margin:3px 0', text: (k + 1) + ') ' + s })); });
-          } else if (d.text) {
-            body.appendChild(U.el('div', { style: 'white-space:pre-wrap;line-height:1.6', text: d.text }));
+          if (ing && ing.length) body.appendChild(U.el('div', { class: 'muted', style: 'font-size:13px', text: '食材：' + ing.join('、') }));
+          if (st && st.length) {
+            st.forEach(function (s, k) { body.appendChild(U.el('div', { style: 'margin:3px 0', text: (k + 1) + ') ' + s })); });
+          } else if (txt) {
+            body.appendChild(U.el('div', { style: 'white-space:pre-wrap;line-height:1.6', text: txt }));
           }
           if (d.sourceUrl) body.appendChild(U.el('a', { class: 'muted', style: 'font-size:12px;display:block;margin-top:4px', href: d.sourceUrl, target: '_blank', rel: 'noopener', text: '🔗 原链接' }));
         });
@@ -415,10 +485,14 @@ App.pages = App.pages || {};
         var list = dishes.filter(function (d) { return g[0] === 'other' ? (d.type !== 'meat' && d.type !== 'veg' && d.type !== 'soup') : d.type === g[0]; });
         if (!list.length) return '';
         var block = '【' + g[1] + '】\n' + list.map(function (d, i) {
+          var real = loadReal(d.name);
+          var ing = (real && real.ingredients && real.ingredients.length) ? real.ingredients : d.ingredients;
+          var st = (real && real.steps && real.steps.length) ? real.steps : d.steps;
+          var txt = (real && real.text) ? real.text : d.text;
           var lines = [(i + 1) + '. ' + d.name];
-          if (d.ingredients && d.ingredients.length) lines.push('  食材：' + d.ingredients.join('、'));
-          if (d.steps && d.steps.length) lines.push('  做法：\n' + d.steps.map(function (s, k) { return '    ' + (k + 1) + ') ' + s; }).join('\n'));
-          else if (d.text) lines.push('  原文：\n' + d.text);
+          if (ing && ing.length) lines.push('  食材：' + ing.join('、'));
+          if (st && st.length) lines.push('  做法：\n' + st.map(function (s, k) { return '    ' + (k + 1) + ') ' + s; }).join('\n'));
+          else if (txt) lines.push('  原文：\n' + txt);
           if (d.sourceUrl) lines.push('  原链接：' + d.sourceUrl);
           return lines.join('\n');
         }).join('\n');
@@ -456,11 +530,31 @@ App.pages = App.pages || {};
       else if (node) previewBox.appendChild(node);
     }
 
+    function guessCat(name) {
+      var n = (name || '');
+      if (/汤|羹|煲/.test(n)) return 'soup';
+      if (/凉拌|沙拉|蔬|青菜|白灼|拌|炝|灼/.test(n)) return 'veg';
+      if (/炒|烧|炖|炸|煎|烤|煮|蒸|卤|焖|烩|肉|鸡|鱼|虾|牛|猪|羊|排|丸/.test(n)) return 'meat';
+      return 'other';
+    }
     function buildImportPreview(parsed, sourceUrl, platformLabel) {
       var node = U.el('div', { class: 'import-preview' });
       node.appendChild(U.el('div', { class: 'card-sub', text: '解析结果（' + (platformLabel || '链接') + '）' }));
       if (parsed.image) node.appendChild(U.el('img', { src: parsed.image, style: 'width:140px;border-radius:10px;margin:6px 0;background:var(--surface-3)', onerror: function () { this.style.display = 'none'; } }));
       node.appendChild(U.el('div', { style: 'font-weight:800;font-size:15px', text: parsed.title || '未命名' }));
+      var guess = guessCat(parsed.title || '');
+      var catSel = U.el('select', { class: 'input', style: 'margin:6px 0;max-width:220px;display:block' });
+      CATS.forEach(function (g) {
+        var og = U.el('optgroup', { label: g.group });
+        g.items.forEach(function (it) {
+          var o = U.el('option', { value: it.id, text: it.name });
+          if (it.id === guess) o.selected = true;
+          og.appendChild(o);
+        });
+        catSel.appendChild(og);
+      });
+      node.appendChild(U.el('label', { class: 'muted', style: 'font-size:12px;display:block', text: '分类（归入菜谱分类 / 转盘）' }));
+      node.appendChild(catSel);
       if (parsed.ingredients && parsed.ingredients.length) node.appendChild(U.el('div', { class: 'muted', style: 'font-size:13px;margin-top:4px', text: '食材：' + parsed.ingredients.join('、') }));
       if (parsed.steps && parsed.steps.length) {
         node.appendChild(U.el('div', { class: 'muted', style: 'font-size:13px;margin-top:4px', text: '做法：' + parsed.steps.length + ' 步' }));
@@ -468,15 +562,16 @@ App.pages = App.pages || {};
         node.appendChild(U.el('div', { style: 'white-space:pre-wrap;font-size:13px;margin-top:4px;max-height:160px;overflow:auto', text: parsed.text }));
       }
       node.appendChild(U.el('button', { class: 'btn sm', style: 'margin-top:8px', text: '💾 保存为我的菜单', onclick: function () {
-        saveImported(parsed, sourceUrl, platformLabel);
+        saveImported(parsed, sourceUrl, platformLabel, catSel.value);
       } }));
       return node;
     }
 
-    function saveImported(parsed, sourceUrl, platformLabel) {
+    function saveImported(parsed, sourceUrl, platformLabel, catId) {
       var imported = getImported();
+      var type = (catId === 'meat' || catId === 'veg' || catId === 'soup') ? catId : 'other';
       var d = {
-        id: 'imp-' + U.uid(), name: parsed.title || '未命名菜单', cats: ['imported'],
+        id: 'imp-' + U.uid(), name: parsed.title || '未命名菜单', cats: ['imported'].concat(catId ? [catId] : []), type: type,
         image: parsed.image || '', ingredients: parsed.ingredients || [], steps: parsed.steps || [],
         text: parsed.text || '', video: sourceUrl || '', sourceUrl: sourceUrl || '',
         platformLabel: platformLabel || '', imported: true, hue: 20
