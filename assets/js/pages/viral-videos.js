@@ -765,6 +765,46 @@ App.pages['vv-library'] = function (root) {
   var listBox = U.el('div', { id: 'vvList' });
   root.appendChild(listBox);
 
+  function renderGuide(state, box) {
+    U.clear(box);
+    var tracks;
+    if (state.track !== 'all') tracks = [state.track];
+    else if (state.catGroup !== 'all') { var g = CATS.filter(function (c) { return c.id === state.catGroup; })[0]; tracks = g ? g.tracks : []; }
+    else tracks = null;
+    if (!tracks) {
+      box.appendChild(U.el('div', { class: 'card', style: 'margin-top:14px' }, [
+        U.el('div', { class: 'card-title', text: '📸 分类拍摄指南' }),
+        U.el('div', { class: 'muted', text: '点击上方「宠物大类」或「二级类目」标签，这里会给出该类的景别 / 运镜 / 文案 / BGM / 标签 拍摄要点。' })
+      ]));
+      return;
+    }
+    var items = POOL.filter(function (p) { return tracks.indexOf(p.track) > -1; });
+    if (!items.length) { U.clear(box); return; }
+    function uniq(arr) { var s = {}, out = []; arr.forEach(function (x) { if (x && !s[x]) { s[x] = 1; out.push(x); } }); return out; }
+    var visual = uniq(items.map(function (p) { return p.reason.visual; }));
+    var shoot = uniq(items.map(function (p) { return p.inspire.shoot; }));
+    var copy = uniq(items.map(function (p) { return p.reason.copy; }));
+    var bgm = uniq(items.map(function (p) { return p.reason.bgm; }));
+    var tag = uniq(items.map(function (p) { return p.reason.tag; }));
+    var topic = uniq(items.map(function (p) { return p.inspire.topic; }));
+    var title = state.track !== 'all' ? state.track : (CATS.filter(function (c) { return c.id === state.catGroup; })[0].name);
+    var card = U.el('div', { class: 'card', style: 'margin-top:14px' });
+    card.appendChild(U.el('div', { class: 'card-title', text: '📸 ' + title + ' · 分类拍摄指南' }));
+    var rows = [
+      ['🎥 景别 / 运镜', visual.concat(shoot)],
+      ['✍ 文案话术', copy],
+      ['🎵 热门 BGM', bgm],
+      ['🏷 流量标签', tag],
+      ['💡 选题方向', topic]
+    ];
+    rows.forEach(function (rw) {
+      if (!rw[1].length) return;
+      card.appendChild(U.el('div', { class: 'card-sub', style: 'margin:8px 0 4px', text: rw[0] }));
+      card.appendChild(U.el('div', { style: 'font-size:13px;line-height:1.6', text: rw[1].join(' / ') }));
+    });
+    box.appendChild(card);
+  }
+
   function render() {
     favBtn.textContent = state.view === 'favorites' ? '全部素材' : '我的收藏';
     favBtn.classList.toggle('active', state.view === 'favorites');
@@ -774,6 +814,9 @@ App.pages['vv-library'] = function (root) {
     expBtn.style.display = state.batchMode ? '' : 'none';
     renderTracks(state, catGroupBar, trackChips);
     var arr = filtered(state);
+    var guideBox = U.$('#vvGuide');
+    if (!guideBox) { guideBox = U.el('div', { id: 'vvGuide' }); root.insertBefore(guideBox, listBox); }
+    renderGuide(state, guideBox);
     U.clear(listBox);
     if (!arr.length) { listBox.appendChild(U.el('div', { class: 'empty', text: '暂无素材，点击「一键刷新榜单」或「手动新增」' })); return; }
     arr.forEach(function (it) { listBox.appendChild(videoCard(it, state)); });

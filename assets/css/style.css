@@ -334,7 +334,6 @@ body {
   overflow: hidden; cursor: pointer; transition: .15s; display: flex; flex-direction: column;
 }
 .dish-card:hover { box-shadow: 0 6px 18px rgba(31,36,48,.08); transform: translateY(-2px); border-color: var(--nav-orange); }
-.dish-img { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; background: var(--surface-3); display: block; }
 .dish-info { padding: 10px 12px; }
 .dish-name { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
 .dish-tags { display: flex; gap: 5px; flex-wrap: wrap; }
