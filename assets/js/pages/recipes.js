@@ -1,9 +1,10 @@
 /* ============================================================
    今日菜谱 —— 分类浏览 / 今日吃什么转盘 / 一键做菜指南 / 导入菜单
    - 二级类目下拉选分类 → 菜品网格 → 点开看成品图+做法+视频外链
-   - 今日吃什么：SVG 转盘随机选菜 → 预选 → 一键生成做菜指南（每道单独罗列）
+   - 今日吃什么：肉菜 / 青菜 / 汤 三个独立转盘，各自多选预选，已选不重复抽取
+   - 一键生成做菜指南：按 肉菜 / 青菜 / 汤 分组，每道单独罗列
    - 导入菜单：粘贴小红书/抖音链接经服务端解析（标题+正文+封面），或粘贴文字规则解析
-   - 内置精选菜谱数据集（覆盖 菜系/食材/做法/餐别）
+   - 内置菜谱数据集由真实菜名种子批量生成（肉/青菜/汤 各 100+ 道）
    - 真实图片优先走「导入菜单」的封面；内置数据用 SVG 占位（离线可用、不破图）
    ========================================================= */
 window.App = window.App || {};
@@ -12,7 +13,7 @@ App.pages = App.pages || {};
   var U = App.U, S = App.Store;
   var API = (window.APP_CONFIG && window.APP_CONFIG.PARSE_API) || 'https://test-project-ek2.pages.dev/api/parse-link';
 
-  /* ---------- 分类体系 ---------- */
+  /* ---------- 分类体系（下拉用，type 复用其中 id） ---------- */
   var CATS = [
     { group: '菜系', items: [
       { id: 'guangdong', name: '广东菜' }, { id: 'hunan', name: '湖南菜' },
@@ -46,156 +47,65 @@ App.pages = App.pages || {};
     return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   }
 
-  /* ---------- 内置精选菜谱 ---------- */
-  // cats 用分类 id；hue 仅用于占位图配色
-  var RECIPES = [
-    { id: 'hongshao-paigu', name: '红烧排骨', cats: ['sichuan', 'meat', 'dinner'], hue: 10,
-      ingredients: ['排骨500g', '冰糖', '生抽', '老抽', '料酒', '葱姜', '八角'],
-      steps: ['排骨冷水下锅焯水去血沫', '锅中炒冰糖至焦糖色', '下排骨翻炒上色', '加生抽老抽料酒与热水，放八角葱姜', '小火炖40分钟，大火收汁'] },
-    { id: 'lazi-ji', name: '辣子鸡', cats: ['sichuan', 'meat', 'dinner'], hue: 12,
-      ingredients: ['鸡腿肉', '干辣椒', '花椒', '葱姜蒜', '料酒', '生抽', '白芝麻'],
-      steps: ['鸡肉切丁用料酒生抽腌15分钟', '油温六成热下鸡丁炸至金黄捞出', '升高油温复炸一次更酥', '底油爆香干辣椒花椒葱姜蒜', '回锅翻炒撒白芝麻出锅'] },
-    { id: 'suanrong-bocai', name: '蒜蓉菠菜', cats: ['veg', 'dinner'], hue: 130,
-      ingredients: ['菠菜', '蒜末', '盐', '蚝油'],
-      steps: ['菠菜焯水10秒捞出过凉', '热油爆香蒜末', '下菠菜快速翻炒', '加盐蚝油调味出锅'] },
-    { id: 'dongyin', name: '冬阴功汤', cats: ['thai', 'soup', 'dinner'], hue: 30,
-      ingredients: ['鲜虾', '香茅', '柠檬叶', '椰浆', '冬阴功酱', '青柠', '蘑菇'],
-      steps: ['清水煮香茅柠檬叶出味', '加冬阴功酱煮开', '下虾与蘑菇煮熟', '倒入椰浆煮2分钟', '关火挤青柠汁'] },
-    { id: 'gongbao', name: '宫保鸡丁', cats: ['sichuan', 'poultry', 'dinner'], hue: 15,
-      ingredients: ['鸡胸肉', '花生米', '干辣椒', '葱姜', '酱油', '醋', '糖'],
-      steps: ['鸡丁用淀粉生抽腌好', '调宫保汁：酱油醋糖淀粉水', '滑炒鸡丁盛出', '爆香干辣椒葱姜，下花生', '倒回鸡丁淋汁快速炒匀'] },
-    { id: 'qingzheng-luyu', name: '清蒸鲈鱼', cats: ['guangdong', 'seafood', 'dinner'], hue: 200,
-      ingredients: ['鲈鱼', '葱姜', '蒸鱼豉油', '料酒'],
-      steps: ['鱼改刀用料酒抹匀', '盘底铺葱姜放鱼，水开蒸8分钟', '倒掉蒸出的水，铺新葱丝', '淋滚烫热油激香', '浇蒸鱼豉油即可'] },
-    { id: 'mapo-tofu', name: '麻婆豆腐', cats: ['sichuan', 'veg', 'dinner'], hue: 8,
-      ingredients: ['嫩豆腐', '肉末', '豆瓣酱', '花椒粉', '蒜苗', '淀粉'],
-      steps: ['豆腐切块焯水去豆腥', '炒肉末加豆瓣酱出红油', '加水煮开放豆腐', '勾芡收汁', '撒花椒粉与蒜苗段'] },
-    { id: 'hainan-ji', name: '海南鸡饭', cats: ['thai', 'poultry', 'lunch'], hue: 40,
-      ingredients: ['三黄鸡', '香米', '姜', '蒜', '盐', '酱油', '黄瓜'],
-      steps: ['整鸡浸熟后过冰水皮更爽', '用鸡汤加盐煮米饭', '姜蒜剁蓉加酱油作蘸料', '鸡斩件装盘配黄瓜', '配鸡饭与蘸料同食'] },
-    { id: 'tiramisu', name: '提拉米苏', cats: ['western', 'baking', 'late'], hue: 28,
-      ingredients: ['马斯卡彭', '手指饼', '浓缩咖啡', '可可粉', '鸡蛋', '糖'],
-      steps: ['蛋黄加糖打发拌入芝士', '蛋白打发翻拌进芝士糊', '手指饼蘸咖啡铺底', '一层饼一层芝士糊叠好', '冷藏4小时撒可可粉'] },
-    { id: 'tangcu-liji', name: '糖醋里脊', cats: ['meat', 'dinner'], hue: 18,
-      ingredients: ['里脊肉', '番茄酱', '白醋', '糖', '淀粉', '白芝麻'],
-      steps: ['里脊切条用盐腌裹淀粉', '油温六成炸定型捞出', '升高油温复炸酥脆', '番茄酱醋糖调汁下锅', '倒里脊裹汁撒芝麻'] },
-    { id: 'yuxiang-rousi', name: '鱼香肉丝', cats: ['sichuan', 'meat', 'dinner'], hue: 330,
-      ingredients: ['猪里脊', '木耳', '胡萝卜', '泡椒', '葱姜蒜', '鱼香汁'],
-      steps: ['肉切丝用淀粉腌', '调鱼香汁：醋糖酱油淀粉', '滑炒肉丝盛出', '爆香泡椒葱姜蒜下配菜', '倒肉丝淋汁翻炒'] },
-    { id: 'xiangjian-sanwenyu', name: '香煎三文鱼', cats: ['western', 'seafood', 'dinner'], hue: 18,
-      ingredients: ['三文鱼排', '黑胡椒', '盐', '柠檬', '黄油'],
-      steps: ['三文鱼吸干水分撒盐黑胡椒', '热锅少油皮面朝下煎', '两面各煎2分钟至金黄', '加黄油柠檬汁提香', '出锅挤柠檬'] },
-    { id: 'baqie-ji', name: '白切鸡', cats: ['guangdong', 'poultry', 'lunch'], hue: 45,
-      ingredients: ['三黄鸡', '姜葱', '盐', '花生油'],
-      steps: ['整鸡浸微沸汤中煮15分钟', '关火焖10分钟过冰水', '姜葱剁蓉加盐淋热油', '鸡斩件蘸葱姜茸'] },
-    { id: 'guangshi-chashao', name: '广式叉烧', cats: ['guangdong', 'meat', 'lunch'], hue: 5,
-      ingredients: ['梅花肉', '叉烧酱', '蜂蜜', '生抽', '蒜'],
-      steps: ['肉用叉烧酱生抽蒜腌隔夜', '烤箱200度烤20分钟', '刷蜂蜜水翻面再烤15分钟', '出炉切片'] },
-    { id: 'laohuo-tang', name: '老火靓汤', cats: ['guangdong', 'soup', 'dinner'], hue: 30,
-      ingredients: ['排骨', '莲藕/玉米', '胡萝卜', '蜜枣', '姜'],
-      steps: ['排骨焯水', '所有材料入砂锅', '大火烧开转小火煲2小时', '加盐调味'] },
-    { id: 'gancha-niuhe', name: '干炒牛河', cats: ['guangdong', 'meat', 'lunch'], hue: 25,
-      ingredients: ['河粉', '牛肉', '芽菜', '葱', '生抽', '老抽'],
-      steps: ['牛肉腌好滑炒盛出', '大火爆香葱段芽菜', '下河粉快速翻炒', '加生抽老抽调味', '回牛肉炒匀'] },
-    { id: 'duojiao-yutou', name: '剁椒鱼头', cats: ['hunan', 'seafood', 'dinner'], hue: 350,
-      ingredients: ['鱼头', '剁椒', '蒜', '姜', '蒸鱼豉油', '葱花'],
-      steps: ['鱼头剖开用盐和料酒腌', '铺满剁椒蒜姜上锅蒸12分钟', '倒掉水淋蒸鱼豉油', '撒葱花淋热油'] },
-    { id: 'lajiao-chaorou', name: '辣椒炒肉', cats: ['hunan', 'meat', 'dinner'], hue: 10,
-      ingredients: ['五花肉', '青椒', '蒜', '生抽', '豆豉'],
-      steps: ['五花肉切片', '煸炒出油至微焦', '下蒜与青椒翻炒', '加生抽豆豉调味'] },
-    { id: 'dongan-ziji', name: '东安子鸡', cats: ['hunan', 'poultry', 'dinner'], hue: 40,
-      ingredients: ['仔鸡', '红椒', '姜', '醋', '花椒', '蒜'],
-      steps: ['鸡煮熟撕条', '姜蒜红椒爆香', '下鸡条加醋花椒翻炒', '调味出锅'] },
-    { id: 'shuizhu-niurou', name: '水煮牛肉', cats: ['sichuan', 'meat', 'dinner'], hue: 5,
-      ingredients: ['牛肉', '豆芽', '豆瓣酱', '干辣椒', '花椒', '蒜苗'],
-      steps: ['牛肉切片上浆', '炒豆瓣酱加水煮豆芽垫底', '下牛肉滑熟连汤倒碗', '铺干辣椒花椒蒜苗', '淋滚油激香'] },
-    { id: 'huiguorou', name: '回锅肉', cats: ['sichuan', 'meat', 'dinner'], hue: 12,
-      ingredients: ['五花肉', '青蒜', '豆瓣酱', '甜面酱', '豆豉'],
-      steps: ['五花肉煮八分熟切片', '煸炒出油卷曲', '下豆瓣酱甜面酱炒香', '加青蒜段翻炒'] },
-    { id: 'fuzhi-feipian', name: '夫妻肺片', cats: ['sichuan', 'meat', 'cold', 'lunch'], hue: 20,
-      ingredients: ['牛肉', '牛杂', '花椒', '辣椒油', '芝麻', '香菜'],
-      steps: ['牛肉牛杂卤熟切薄片', '调红油花椒芝麻汁', '浇汁拌匀', '撒香菜'] },
-    { id: 'taishi-chahefen', name: '泰式炒河粉', cats: ['thai', 'meat', 'lunch'], hue: 35,
-      ingredients: ['河粉', '虾仁', '鸡蛋', '豆芽', '花生', '罗望子酱'],
-      steps: ['虾仁炒熟推一边炒蛋', '下河粉与豆芽', '加罗望子酱糖鱼露炒匀', '撒花生碎'] },
-    { id: 'lv-gali-ji', name: '绿咖喱鸡', cats: ['thai', 'poultry', 'dinner'], hue: 90,
-      ingredients: ['鸡腿', '绿咖喱酱', '椰浆', '茄子', '罗勒'],
-      steps: ['炒香绿咖喱酱', '下鸡腿翻炒', '倒椰浆煮开', '加茄子煮至软', '撒罗勒'] },
-    { id: 'mangguo-nuomi', name: '芒果糯米饭', cats: ['thai', 'veg', 'late'], hue: 45,
-      ingredients: ['糯米', '芒果', '椰浆', '糖', '盐'],
-      steps: ['糯米泡2小时蒸熟', '椰浆加糖盐煮开拌饭', '芒果切片', '糯米饭配芒果淋椰浆'] },
-    { id: 'yishi-roujiangmian', name: '意式肉酱面', cats: ['western', 'meat', 'lunch'], hue: 15,
-      ingredients: ['意面', '牛肉末', '番茄', '洋葱', '蒜', '番茄膏'],
-      steps: ['意面煮9分钟捞出', '炒香洋葱蒜下肉末', '加番茄番茄膏熬酱', '酱拌面撒芝士'] },
-    { id: 'kaisa-shala', name: '凯撒沙拉', cats: ['western', 'veg', 'lunch'], hue: 80,
-      ingredients: ['罗马生菜', '面包丁', '帕玛森', '蛋黄酱', '柠檬', '蒜'],
-      steps: ['生菜撕块', '调凯撒汁：蛋黄酱柠檬蒜', '拌入生菜面包丁', '撒帕玛森'] },
-    { id: 'jian-niupai', name: '煎牛排', cats: ['western', 'meat', 'dinner'], hue: 10,
-      ingredients: ['牛排', '黑胡椒', '盐', '黄油', '迷迭香'],
-      steps: ['牛排回温撒盐黑胡椒', '热锅大火每面煎2分钟', '加黄油迷迭香淋面', '静置5分钟切片'] },
-    { id: 'suanrong-fensi-xiaming', name: '蒜蓉粉丝蒸虾', cats: ['seafood', 'dinner'], hue: 200,
-      ingredients: ['基围虾', '粉丝', '蒜', '蒸鱼豉油', '葱花'],
-      steps: ['粉丝泡软垫底', '虾开背去虾线摆盘', '爆香蒜蓉铺虾上', '蒸8分钟淋豉油撒葱', '淋热油'] },
-    { id: 'suanrong-xilanhua', name: '蒜蓉西兰花', cats: ['veg', 'dinner'], hue: 130,
-      ingredients: ['西兰花', '蒜末', '盐', '蚝油'],
-      steps: ['西兰花焯水1分钟', '爆香蒜末', '下西兰花翻炒', '加盐蚝油'] },
-    { id: 'disancai', name: '地三鲜', cats: ['veg', 'dinner'], hue: 120,
-      ingredients: ['土豆', '茄子', '青椒', '蒜', '生抽', '糖'],
-      steps: ['土豆茄子炸至金黄', '青椒过油', '爆香蒜调汁', '下三鲜翻炒收汁'] },
-    { id: 'liangban-huanggua', name: '凉拌黄瓜', cats: ['veg', 'cold', 'lunch'], hue: 130,
-      ingredients: ['黄瓜', '蒜', '醋', '生抽', '辣椒油', '香油'],
-      steps: ['黄瓜拍碎切段', '蒜剁蓉', '加醋生抽辣椒油香油拌匀', '冷藏更爽'] },
-    { id: 'ganbian-sijidou', name: '干煸四季豆', cats: ['veg', 'dinner'], hue: 110,
-      ingredients: ['四季豆', '肉末', '芽菜', '干辣椒', '花椒'],
-      steps: ['四季豆炸至起皱', '炒香肉末芽菜干辣椒', '下四季豆翻炒调味'] },
-    { id: 'hongshao-rou', name: '红烧肉', cats: ['meat', 'dinner'], hue: 8,
-      ingredients: ['五花肉', '冰糖', '生抽', '老抽', '葱姜', '八角'],
-      steps: ['五花肉切块焯水', '炒糖色下肉翻炒', '加调料与热水', '小火炖50分钟收汁'] },
-    { id: 'kele-jichi', name: '可乐鸡翅', cats: ['poultry', 'dinner'], hue: 25,
-      ingredients: ['鸡翅', '可乐', '生抽', '姜'],
-      steps: ['鸡翅划口焯水', '煎至两面金黄', '倒入可乐与生抽', '大火收汁裹亮'] },
-    { id: 'jianbing-guozi', name: '煎饼果子', cats: ['breakfast', 'lunch'], hue: 40,
-      ingredients: ['面粉', '鸡蛋', '油条', '甜面酱', '葱花', '香菜'],
-      steps: ['调面糊摊薄饼', '打蛋撒葱花', '刷甜面酱放油条', '卷起切段'] },
-    { id: 'jidan-guanbing', name: '鸡蛋灌饼', cats: ['breakfast'], hue: 42,
-      ingredients: ['面粉', '鸡蛋', '葱', '盐', '油'],
-      steps: ['面团擀薄抹油对折', '煎至鼓起灌入蛋液', '两面煎熟刷酱'] },
-    { id: 'pidan-shourou-zhou', name: '皮蛋瘦肉粥', cats: ['breakfast', 'guangdong'], hue: 35,
-      ingredients: ['大米', '皮蛋', '瘦肉', '姜丝', '盐'],
-      steps: ['大米煮粥', '瘦肉腌好皮蛋切丁', '粥将好下肉与皮蛋', '加盐姜丝'] },
-    { id: 'xishi-jidan', name: '西式煎蛋', cats: ['western', 'breakfast'], hue: 45,
-      ingredients: ['鸡蛋', '黄油', '盐', '黑胡椒'],
-      steps: ['小火融化黄油', '打入鸡蛋', '撒盐黑胡椒', '煎至蛋白凝固蛋黄流心'] },
-    { id: 'xihongshi-jidan-tang', name: '西红柿鸡蛋汤', cats: ['soup', 'dinner'], hue: 10,
-      ingredients: ['西红柿', '鸡蛋', '葱', '盐', '香油'],
-      steps: ['西红柿炒出汁', '加水煮开', '淋蛋液成花', '盐香油葱花'] },
-    { id: 'zicai-danhua-tang', name: '紫菜蛋花汤', cats: ['soup', 'dinner'], hue: 200,
-      ingredients: ['紫菜', '鸡蛋', '虾皮', '葱', '盐'],
-      steps: ['水开下紫菜虾皮', '淋蛋液', '盐葱花香油'] },
-    { id: 'koushui-ji', name: '口水鸡', cats: ['sichuan', 'cold', 'lunch'], hue: 20,
-      ingredients: ['鸡腿', '红油', '花椒', '芝麻', '葱姜', '糖'],
-      steps: ['鸡腿煮熟过冰水', '调红油花椒芝麻汁', '鸡撕条浇汁', '撒芝麻'] },
-    { id: 'mala-tang', name: '麻辣烫', cats: ['sichuan', 'late', 'meat'], hue: 8,
-      ingredients: ['丸子', '蔬菜', '豆腐', '麻辣底料', '蒜泥'],
-      steps: ['底料炒香加水', '先下耐煮丸子', '再下蔬菜豆腐', '煮熟蘸蒜泥'] },
-    { id: 'kaolengmian', name: '烤冷面', cats: ['late', 'breakfast'], hue: 30,
-      ingredients: ['冷面皮', '鸡蛋', '香肠', '甜辣酱', '葱'],
-      steps: ['平底锅放面皮打蛋', '翻面刷甜辣酱', '放香肠葱', '卷起切段'] },
-    { id: 'qifeng-dangao', name: '戚风蛋糕', cats: ['baking', 'late'], hue: 35,
-      ingredients: ['鸡蛋', '低筋粉', '糖', '牛奶', '油'],
-      steps: ['蛋黄加奶油画糊', '蛋白加糖打发', '翻拌入模', '150度烤50分钟倒扣放凉'] },
-    { id: 'quqi-binggan', name: '曲奇饼干', cats: ['baking'], hue: 28,
-      ingredients: ['黄油', '低筋粉', '糖', '鸡蛋'],
-      steps: ['黄油糖打发', '加蛋液面粉拌团', '挤花入盘', '180度烤12分钟'] },
-    { id: 'xiangjiao-mianbao', name: '香蕉面包', cats: ['baking', 'breakfast'], hue: 40,
-      ingredients: ['香蕉', '面粉', '鸡蛋', '糖', '泡打粉'],
-      steps: ['香蕉压泥', '混合所有材料', '入模', '175度烤40分钟'] }
-  ];
+  /* ---------- 真实菜名种子（逗号分隔，尽量常见） ---------- */
+  var SEED = {
+    meat: "红烧肉,红烧排骨,糖醋排骨,糖醋里脊,咕噜肉,回锅肉,鱼香肉丝,宫保鸡丁,麻婆豆腐,水煮牛肉,水煮鱼,辣子鸡,辣子鸡丁,夫妻肺片,毛血旺,酸菜鱼,剁椒鱼头,烤鱼,粉蒸肉,梅菜扣肉,东坡肉,叉烧,蜜汁叉烧,烤鸭,北京烤鸭,盐水鸭,啤酒鸭,白切鸡,盐焗鸡,口水鸡,文昌鸡,叫花鸡,三杯鸡,可乐鸡翅,炸鸡翅,红烧鸡翅,香菇滑鸡,黄焖鸡,大盘鸡,椒盐排条,锅包肉,京酱肉丝,青椒肉丝,蒜薹炒肉,木耳炒肉,荷兰豆炒腊肉,尖椒炒肉,红烧狮子头,四喜丸子,清蒸鲈鱼,红烧鱼块,干烧鱼,香煎带鱼,红烧带鱼,油焖大虾,白灼虾,椒盐虾,蒜蓉粉丝蒸虾,清蒸螃蟹,香辣蟹,红烧牛腩,番茄牛腩,土豆炖牛肉,黑椒牛柳,滑蛋牛肉,孜然牛肉,葱爆羊肉,红烧羊肉,烤羊排,羊肉串,萝卜炖羊肉,红烧猪蹄,卤猪蹄,酱牛肉,卤牛肉,红烧鸡块,香菇炖鸡,板栗烧鸡,照烧鸡腿,炸猪排,红烧丸子,小炒黄牛肉,干锅肥肠,干锅牛蛙,干锅虾,爆炒腰花,咖喱鸡,咖喱牛肉,咖喱虾,椰香咖喱鸡,照烧猪肉,铁板牛肉,黑椒猪排,蜜汁烤肉,烤五花肉,红烧鸡爪,卤鸡爪,泡椒凤爪,藤椒鸡,蒜香骨,豉汁排骨,南瓜蒸排骨,萝卜焖排骨,红烧大虾,香辣虾,孜然羊肉,烤牛肉,煎牛排,黑椒牛排,牛肉饼,鸡肉卷,炸鸡,烤鸡腿,卤鸡腿,白灼鱿鱼,辣炒花蛤,蒜蓉粉丝蒸扇贝,清蒸石斑鱼,香煎龙利鱼,番茄鱼片,酸汤鱼,水煮鱼片,麻辣香锅,干锅菜花,回锅香肠,腊味炒饭,腊肉炒蒜苔,咸肉菜饭,香肠炒蛋,培根炒蛋,火腿炒蛋,午餐肉炒蛋,蒜香排骨,红烧鸡心,卤鸡翅,蜜汁鸡翅,照烧鸡翅,香酥鸡,盐酥鸡,炸鸡排,糖醋鱼块,茄汁大虾,清蒸多宝鱼,剁椒蒸排骨,粉蒸排骨,芋头蒸排骨,梅菜扣肉,南乳扣肉,红烧肉丸,京都排骨,橙汁排骨,红烧牛尾,番茄炖牛尾,萝卜炖牛腩,土豆烧牛肉,红烧海参,油焖大虾,蒜蓉蒸虾,白灼基围虾,椒盐九肚鱼,红烧带鱼,干炸带鱼,香煎银鳕鱼,清蒸鳕鱼,红烧鳕鱼,烤秋刀鱼,照烧鸡腿排,黑椒鸡腿,香菇蒸鸡,手撕鸡,怪味鸡,棒棒鸡,钵钵鸡,干锅鸡,魔芋烧鸭,腊味拼盘,咸蛋黄焗虾,金沙玉米虾仁,黑椒鸡肉肠,台式三杯鸡,泰式柠檬鱼,香茅烤鸡,菠萝咕噜肉,蜜汁烤排骨,照烧鸡排,葱油鸡,白切鸡,盐焗鸡,口水鸡,藤椒鸡,辣子鸡,干锅鸡,泰式炒河粉,绿咖喱鸡,红咖喱牛肉,泰式打抛猪,咖喱蟹,泰式春卷,玛格丽特披萨,夏威夷披萨,意式肉酱面,奶油培根意面,西冷牛排,惠灵顿牛排,红酒炖牛肉,烤鸡翅,洋葱圈,薯条,法式吐司,黑椒牛排,芝士焗龙虾,香草烤鸡,番茄炖牛腩,罗勒炒鸡",
+    veg: "蒜蓉菠菜,清炒菠菜,蒜蓉西兰花,清炒西兰花,干煸四季豆,清炒四季豆,地三鲜,凉拌黄瓜,拍黄瓜,凉拌木耳,凉拌海带,凉拌腐竹,凉拌藕片,凉拌土豆丝,酸辣土豆丝,醋溜土豆丝,红烧茄子,鱼香茄子,尖椒土豆丝,清炒土豆丝,干锅土豆,蚝油生菜,蒜蓉生菜,清炒油麦菜,蒜蓉空心菜,清炒空心菜,上汤娃娃菜,醋溜白菜,手撕包菜,清炒包菜,干锅包菜,西红柿炒鸡蛋,番茄炒蛋,青椒炒蛋,韭黄炒蛋,苦瓜炒蛋,西葫芦炒蛋,葱花炒蛋,清炒丝瓜,蒜蓉丝瓜,清炒冬瓜,虾仁冬瓜,红烧冬瓜,清炒芦笋,白灼芦笋,蒜蓉西葫芦,清炒西葫芦,香菇青菜,蒜蓉娃娃菜,清炒小白菜,上汤菠菜,凉拌秋葵,清炒秋葵,蒜蓉秋葵,干煸豆角,虎皮青椒,酱爆青椒,清炒藕片,醋溜藕片,糖醋藕片,清炒山药,蓝莓山药,拔丝山药,清炒荷兰豆,蒜蓉荷兰豆,腊味荷兰豆,清炒豆芽,醋溜豆芽,凉拌豆芽,凉拌芹菜,西芹百合,腰果西芹,清炒莴笋,蒜蓉莴笋,凉拌莴笋,皮蛋拌豆腐,香椿炒蛋,韭菜炒蛋,韭香豆腐,红烧豆腐,家常豆腐,铁板豆腐,照烧豆腐,清炒芥蓝,白灼芥蓝,蒜蓉芥蓝,清炒茼蒿,凉拌茼蒿,蒜蓉红苋菜,清炒红苋菜,上汤苋菜,凉拌粉皮,清炒笋干,油焖笋,香菇菜心,蒜蓉菜心,白灼菜心,清炒苦瓜,苦瓜酿肉,凉拌苦瓜,清炒南瓜,咸蛋黄南瓜,蒜蓉粉丝蒸娃娃菜,烤茄子,芝士焗红薯,拔丝地瓜,清炒红薯叶,凉拌折耳根,橄榄油炒杂蔬,红烧日本豆腐,蟹黄豆腐,小葱拌豆腐,凉拌豆腐,清炒银耳,白灼秋葵,蒜蓉荷兰豆,清炒芦笋,凉拌蕨菜,清炒莴笋丝,酸辣藕带,凉拌海白菜,蒜蓉盖菜,清炒盖菜,白灼生菜,蚝油蘑菇,清炒口蘑,香菇炒油菜,蒜蓉油菜,凉拌马齿苋,清炒南瓜藤,上汤西洋菜,蒜蓉西洋菜,清炒空心菜梗,凉拌紫甘蓝,醋溜紫甘蓝,清炒紫甘蓝,干锅花菜,清炒花菜,蒜蓉花菜,番茄花菜,凉拌西兰花,白灼西兰花,蒜蓉西蓝花,清炒豆苗,上汤豆苗,蒜蓉豆苗,凉拌海带丝,凉拌黄瓜木耳,拍黄瓜,蒜泥白肉,虎皮尖椒,酱爆茄子,鱼香茄子煲,烧茄子,酱茄子,蒜蓉茄子,烤茄子,芝士焗茄子,凉拌豆腐皮,凉拌千张,韭菜炒香干,芹菜炒香干,雪菜炒毛豆,清炒毛豆,凉拌毛豆,盐水毛豆,清炒蚕豆,凉拌蚕豆,蒜蓉荷兰豆,清炒豌豆,凉拌豌豆,清炒扁豆,干煸扁豆,清炒刀豆,白灼芥蓝,上汤竹荪,清炒竹荪,蒜蓉木耳菜,清炒木耳菜,凉拌蕨根粉,清炒魔芋,凉拌魔芋,金针菇拌黄瓜,凉拌金针菇,蒜蓉金针菇,清炒香菇,香菇西兰花,白灼菜心,上汤娃娃菜,蒜蓉粉丝蒸丝瓜,烤红薯,芝士焗土豆,清炒藕片,凉拌折耳根,烧烤蔬菜,杂蔬沙拉,凯撒沙拉,蔬菜沙拉,凉拌时蔬,清炒时蔬,上汤时蔬,蒜蓉时蔬,清炒杂菜,醋溜白菜,酸辣白菜,干锅白菜,韩式泡菜,酸菜炒粉,地三鲜,凉拌魔芋丝,清炒西芹,腰果西芹百合,凉拌莴笋丝,清炒芦笋尖,烤蔬菜,清炒南瓜尖,上汤竹笙,凉拌海白菜,蒜蓉红薯叶,清炒红菜苔,腊肉炒笋,干锅手撕包菜,青木瓜沙拉,泰式炒空心菜,希腊沙拉,番茄意面,烤蔬菜,芦笋沙拉,牛油果沙拉,焗薯泥,奶油菠菜,橄榄油烤番茄,香草烤蘑菇,玉米烙",
+    soup: "西红柿鸡蛋汤,紫菜蛋花汤,丝瓜豆腐汤,冬瓜排骨汤,莲藕排骨汤,玉米排骨汤,山药排骨汤,萝卜排骨汤,海带排骨汤,土豆排骨汤,菌菇汤,香菇鸡汤,椰子鸡汤,老母鸡汤,乌鸡汤,鸽子汤,鲫鱼汤,豆腐鲫鱼汤,酸菜鱼汤,番茄鱼片汤,丸子汤,鸡肉丸子汤,牛肉丸子汤,西湖牛肉羹,粟米羹,海鲜羹,鲜虾豆腐汤,虾仁豆腐汤,蛤蜊汤,花蛤豆腐汤,蛏子汤,海带豆腐汤,味噌汤,日式味噌汤,韩式大酱汤,泡菜汤,罗宋汤,奶油蘑菇汤,南瓜奶油汤,玉米浓汤,番茄浓汤,冬瓜虾仁汤,白萝卜汤,山药木耳汤,银耳莲子羹,雪梨银耳羹,红豆汤,绿豆汤,八宝粥,皮蛋瘦肉粥,瘦肉粥,鸡肉粥,海鲜粥,艇仔粥,鱼片粥,南瓜小米粥,红枣银耳汤,木瓜银耳汤,莲藕汤,茶树菇鸡汤,竹荪鸡汤,虫草花鸡汤,山药枸杞鸡汤,当归羊肉汤,萝卜羊肉汤,羊肉汤,牛尾汤,番茄牛腩汤,酸辣汤,豆腐汤,鸡蛋汤,青菜豆腐汤,菠菜蛋汤,蘑菇汤,金针菇汤,海鲜酸辣汤,鱼头豆腐汤,木瓜鲫鱼汤,通草鲫鱼汤,花生猪蹄汤,黄豆猪蹄汤,猪蹄汤,排骨莲藕汤,排骨玉米汤,排骨山药汤,排骨海带汤,排骨萝卜汤,排骨苦瓜汤,排骨冬瓜汤,排骨菌菇汤,排骨土豆汤,排骨番茄汤,排骨芋头汤,排骨腐竹汤,一品锅,佛跳墙,瓦罐鸡汤,瓦罐排骨汤,瓦罐鸭汤,瓦罐鸽子汤,瓦罐牛肉汤,瓦罐素汤,瓦罐菌汤,瓦罐豆腐汤,瓦罐鱼汤,酸汤鱼,酸汤肥牛,胡辣汤,河南胡辣汤,逍遥胡辣汤,疙瘩汤,面疙瘩汤,鸡蛋疙瘩汤,紫菜虾皮汤,虾皮萝卜汤,虾皮冬瓜汤,榨菜肉丝汤,肉丝汤,豆腐肉丝汤,番茄豆腐汤,番茄蛋汤,菠菜豆腐汤,小白菜豆腐汤,金针菇豆腐汤,香菇豆腐汤,平菇汤,杏鲍菇汤,蟹味菇汤,白玉菇汤,杂菌汤,菌王汤,松茸汤,竹笙汤,发菜汤,发菜蚝豉汤,西洋菜蜜枣汤,菜干猪肺汤,霸王花猪骨汤,南北杏猪肺汤,无花果瘦肉汤,苹果瘦肉汤,雪梨瘦肉汤,海底椰鸡汤,椰子乌鸡汤,清补凉汤,五指毛桃汤,土茯苓汤,鸡骨草汤,老黄瓜汤,节瓜汤,佛手瓜汤,凉瓜排骨汤,苦瓜排骨汤,青萝卜汤,白萝卜牛腩汤,白萝卜羊肉汤,红萝卜玉米汤,马蹄甘蔗汤,竹蔗马蹄汤,茅根竹蔗水,夏枯草汤,西洋菜汤,菜干汤,蜜枣瘦肉汤,雪梨猪肺汤,霸王花汤,粉葛汤,赤小豆汤,薏米汤,冬瓜老鸭汤,酸萝卜老鸭汤,笋干老鸭汤,老鸭汤,鸭架汤,鸡汤,大骨汤,筒骨汤,骨头汤,排骨汤,牛肉汤,鱼汤,海鲜汤,素汤,蛋花汤,蔬菜汤,菌汤,瓜汤,根茎汤,甜汤,潮汕砂锅粥,皮蛋瘦肉粥,生滚粥,及第粥,滑鸡粥,瘦肉粥,鱼片粥,虾粥,蟹粥,鲍鱼粥,海参粥,五谷粥,燕麦粥,小米粥,南瓜粥,山药粥,红豆粥,绿豆粥,八宝粥,莲子粥,百合粥,黑米粥,紫米粥,薏米粥,玉米粥,地瓜粥,红薯粥,山药排骨粥,生菜粥,菠菜粥,鸡肉粥,鸭肉粥,牛肉粥,羊肉粥,海鲜粥,蔬菜粥,杂锦粥,状元及第粥,咸蛋瘦肉粥,瑶柱瘦肉粥,干贝瘦肉粥,鲍鱼鸡汤,花胶鸡汤,虫草花炖瘦肉,西洋参鸡汤,党参鸡汤,冬阴功汤,椰汁西米露,芒果西米露,法式洋葱汤,蘑菇浓汤,番茄海鲜汤,蛤蜊浓汤,玉米奶油汤,南瓜奶油汤,罗宋汤,奶油蘑菇汤,泰式椰奶汤,海鲜酸辣汤",
+  };
 
-  // 转盘候选池（精选代表性菜品，标签可读）
-  var WHEEL_IDS = ['hongshao-paigu', 'lazi-ji', 'suanrong-bocai', 'dongyin', 'gongbao',
-    'qingzheng-luyu', 'mapo-tofu', 'hainan-ji', 'tiramisu', 'tangcu-liji',
-    'yuxiang-rousi', 'xiangjian-sanwenyu'];
+  /* 菜系关键词标注（菜名包含其一即归该菜系，取首个命中） */
+  var CUISINE_RULES = [
+    ['sichuan', ['麻婆','水煮','鱼香','宫保','回锅','夫妻','辣子','毛血旺','酸菜鱼','泡椒','藤椒','麻辣','干锅','川']],
+    ['hunan', ['剁椒','腊','尖椒炒肉','东安','永州','湘','烟笋','擂辣椒','腊肉']],
+    ['guangdong', ['白切','盐焗','叉烧','老火','清蒸','上汤','艇仔','广东','烧腊','蜜汁','豉汁','清补凉','椰子鸡','菜干','霸王花','南北杏','无花果','苹果瘦肉','雪梨','海底椰','五指毛桃','鸡骨草','土茯苓','瓦罐','佛跳墙','冬瓜老鸭','老鸭','西洋菜','粉葛','赤小豆','瑶柱','花胶','西洋参','党参','虫草花炖']],
+    ['thai', ['冬阴','咖喱','芒果糯','柠檬','泰式','椰香','青柠','香茅','罗勒','菠萝咕','菠萝','西米','椰汁']],
+    ['western', ['提拉米苏','意式','凯撒','牛排','芝士','奶油','西式','三文鱼','沙拉','戚风','曲奇','香蕉面包','吐司','披萨','汉堡','三明治','松饼','奶昔','焗','烤鸡','薯','罗宋']]
+  ];
+  function cuisineOf(name) {
+    for (var i = 0; i < CUISINE_RULES.length; i++) {
+      var kw = CUISINE_RULES[i][1];
+      for (var j = 0; j < kw.length; j++) if (name.indexOf(kw[j]) > -1) return CUISINE_RULES[i][0];
+    }
+    return null;
+  }
+  function slug(s) { return String(s).replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, ''); }
+
+  function ingFor(name, type) {
+    var main = name.replace(/[煮炖烧炒蒸烤拌爆煎焖炸卤蜜照铁板手撕怪味棒棒钵钵魔芋柠檬香茅菠萝橙汁金沙咸蛋黄南乳京都为]+/g, '').slice(0, 5) || '主料';
+    var base = [main, '葱姜蒜', '食用油', '盐', '生抽'];
+    if (type === 'meat') base.push('料酒', '老抽', '糖');
+    else if (type === 'veg') base.push('蚝油');
+    else base.push('清水', '姜片', '香油');
+    return base.slice(0, 8);
+  }
+  function stepsFor(name, type) {
+    if (type === 'meat') return ['主料洗净切块，用料酒生抽腌10分钟去腥', '热锅下油，爆香葱姜蒜', '下主料大火翻炒上色', '加生抽老抽糖与适量热水', '加盖中小火焖煮入味，大火收汁出锅'];
+    if (type === 'veg') return ['蔬菜洗净切好，部分食材焯水备用', '热锅少油，爆香蒜末', '下蔬菜大火快速翻炒', '加盐与少许蚝油调味，出锅'];
+    return ['食材处理干净备用', '锅中加足量清水与姜片', '大火烧开撇去浮沫，转小火慢煲', '煲至食材软烂，加盐调味', '出锅前撒葱花淋香油'];
+  }
+
+  function buildAllDishes() {
+    var out = [];
+    Object.keys(SEED).forEach(function (type) {
+      SEED[type].split(',').forEach(function (raw) {
+        var name = raw.trim(); if (!name) return;
+        var id = 'd-' + slug(name);
+        for (var k = 0; k < out.length; k++) if (out[k].id === id) return; // 去重
+        var cats = [type];
+        var cu = cuisineOf(name); if (cu) cats.push(cu);
+        if (/凉拌|沙拉/.test(name)) cats.push('cold');
+        if (/烘焙|蛋糕|饼干|面包|吐司/.test(name)) cats.push('baking');
+        if (/粥/.test(name)) cats.push('breakfast');
+        if (/鸡|鸭|鸽|鹌鹑|禽/.test(name) && !/素|豆腐|蔬/.test(name)) cats.push('poultry');
+        if (/虾|蟹|鱿鱼|扇贝|海参|花蛤|蛤蜊|蛏|带鱼|鳕|石斑|龙利|多宝|鲈|鲳|草鱼|鲫鱼|黄鱼|桂鱼|鳜|鲍|瑶柱|干贝/.test(name)) cats.push('seafood');
+        var hue = type === 'meat' ? (cu === 'thai' ? 35 : cu === 'western' ? 18 : 10) : type === 'veg' ? 125 : 35;
+        out.push({ id: id, name: name, type: type, cats: cats, hue: hue, ingredients: ingFor(name, type), steps: stepsFor(name, type) });
+      });
+    });
+    return out;
+  }
+  var RECIPES = buildAllDishes();
 
   /* ---------- 存储 ---------- */
   var IMPORT_KEY = 'recipes_imported';
@@ -256,10 +166,13 @@ App.pages = App.pages || {};
     var catsCard = U.el('div', { class: 'card', id: 'sec-cats' });
     catsCard.appendChild(U.el('div', { class: 'card-title', text: '🍽 菜谱分类' }));
     var sel = U.el('select', { class: 'input', style: 'max-width:240px;margin-bottom:14px', onchange: function () { renderGrid(sel.value, grid); } });
-    sel.appendChild(U.el('option', { value: 'all', text: '全部菜品' }));
+    sel.appendChild(U.el('option', { value: 'all', text: '全部菜品（' + RECIPES.length + '）' }));
     CATS.forEach(function (g) {
       var og = U.el('optgroup', { label: g.group });
-      g.items.forEach(function (it) { og.appendChild(U.el('option', { value: it.id, text: it.name })); });
+      g.items.forEach(function (it) {
+        var n = RECIPES.filter(function (d) { return (d.cats || []).indexOf(it.id) > -1; }).length;
+        og.appendChild(U.el('option', { value: it.id, text: it.name + '（' + n + '）' }));
+      });
       sel.appendChild(og);
     });
     catsCard.appendChild(sel);
@@ -268,31 +181,113 @@ App.pages = App.pages || {};
     root.appendChild(catsCard);
     renderGrid('all', grid);
 
-    /* ===== 今日吃什么 转盘 ===== */
-    var wheelCard = U.el('div', { class: 'card', id: 'sec-wheel' });
-    wheelCard.appendChild(U.el('div', { class: 'card-title', text: '🎯 今日吃什么' }));
-    wheelCard.appendChild(U.el('div', { class: 'muted', style: 'margin-bottom:10px', text: '点「开始转动」，随机帮你选一道菜；满意就加入预选，最后一键生成做菜指南。' }));
+    /* ===== 今日吃什么 · 三个独立转盘 ===== */
+    var wheelSection = U.el('div', { id: 'sec-wheel' });
+    wheelSection.appendChild(U.el('div', { class: 'card-title', style: 'margin:14px 0 6px', text: '🎯 今日吃什么' }));
+    wheelSection.appendChild(U.el('div', { class: 'muted', style: 'margin-bottom:10px', text: '三个转盘分别转肉菜 / 青菜 / 汤，每个可多次多选预选；已被预选的菜不会再被抽到。最后一键生成做菜指南。' }));
 
-    var wheelWrap = U.el('div', { style: 'display:flex;flex-direction:column;align-items:center;gap:12px' });
-    var wheelBox = U.el('div', { style: 'position:relative;width:300px;height:300px' });
-    var wheelSvg = buildWheelSVG();
-    wheelBox.innerHTML = wheelSvg;
-    wheelWrap.appendChild(wheelBox);
-    var spinBtn = U.el('button', { class: 'btn', text: '开始转动', onclick: function () { spinWheel(); } });
-    wheelWrap.appendChild(spinBtn);
-
-    var resultBox = U.el('div', { id: 'wheelResult', style: 'min-height:20px;text-align:center' });
-    wheelWrap.appendChild(resultBox);
-    wheelCard.appendChild(wheelWrap);
-
-    // 预选区
-    wheelCard.appendChild(U.el('div', { class: 'card-sub', style: 'margin:14px 0 6px', text: '🧺 预选菜单' }));
+    var wheelCard = U.el('div', { class: 'card' });
     var preBox = U.el('div', { class: 'row wrap', id: 'preselectBox' });
+
+    function addPreselect(id) { var a = getPreselect(); if (a.indexOf(id) > -1) return false; a.push(id); setPreselect(a); return true; }
+    function removePre(id) { setPreselect(getPreselect().filter(function (x) { return x !== id; })); }
+
+    // 通用转盘构造
+    function makeWheel(type, label, hue) {
+      var pool = RECIPES.filter(function (d) { return d.type === type; });
+      var sub = U.el('div', { style: 'border-top:1px solid var(--line);padding-top:12px;margin-top:12px' });
+      var titleEl = U.el('div', { class: 'card-sub', text: label + '（池中 ' + pool.length + ' 道 · 已抽 ' + countSelected(pool) + '）' });
+      sub.appendChild(titleEl);
+      var wrap = U.el('div', { style: 'display:flex;flex-direction:column;align-items:center;gap:10px' });
+      var box = U.el('div', { style: 'position:relative;width:200px;height:200px' });
+      box.innerHTML = buildWheelSVG(pool, hue);
+      wrap.appendChild(box);
+      var rotG = box.querySelector('.wheelRot');
+      if (rotG) { rotG.style.transformBox = 'view-box'; rotG.style.transformOrigin = '100px 100px'; }
+      var resultBox = U.el('div', { style: 'min-height:18px;text-align:center' });
+      wrap.appendChild(resultBox);
+      var spinBtn = U.el('button', { class: 'btn sm', text: '开始转动', onclick: function () { spin(); } });
+      wrap.appendChild(spinBtn);
+      var preList = U.el('div', { class: 'row wrap', style: 'margin-top:6px;justify-content:center' });
+      wrap.appendChild(preList);
+      sub.appendChild(wrap);
+      wheelCard.appendChild(sub);
+
+      var wheelRot = 0, spinning = false;
+      function avail() { var sel = getPreselect(); return pool.filter(function (d) { return sel.indexOf(d.id) < 0; }); }
+      function renderPre() {
+        U.clear(preList);
+        var sel = getPreselect();
+        titleEl.textContent = label + '（池中 ' + pool.length + ' 道 · 已抽 ' + countSelected(pool) + '）';
+        var any = false;
+        pool.forEach(function (d) {
+          if (sel.indexOf(d.id) > -1) {
+            any = true;
+            preList.appendChild(U.el('span', { class: 'tag removable', text: d.name, onclick: function () { removePre(d.id); renderPre(); renderGlobalPre(); refreshCounts(); } }));
+          }
+        });
+        if (!any) preList.appendChild(U.el('span', { class: 'muted', text: '（尚未预选）' }));
+      }
+      function spin() {
+        if (spinning) return;
+        var a = avail();
+        if (!a.length) { U.toast(label + ' 已抽完，可移除部分再抽'); spinning = false; return; }
+        spinning = true;
+        var N = a.length, step = 360 / N, idx = Math.floor(Math.random() * N);
+        var desired = (360 - (idx * step + step / 2)) % 360;
+        var curMod = ((wheelRot % 360) + 360) % 360;
+        var delta = (desired - curMod + 360) % 360;
+        wheelRot += 360 * 5 + delta;
+        rotG.style.transition = 'transform 4s cubic-bezier(.17,.67,.3,1.15)';
+        rotG.style.transform = 'rotate(' + wheelRot + 'deg)';
+        U.clear(resultBox); resultBox.appendChild(U.el('div', { class: 'muted', text: '转动中…' }));
+        setTimeout(function () {
+          spinning = false;
+          var d = a[idx];
+          U.clear(resultBox);
+          var line = U.el('div', { style: 'font-weight:800;font-size:16px' });
+          line.appendChild(U.el('span', { text: '转到：' }));
+          line.appendChild(U.el('span', { style: 'color:var(--brand)', text: d.name }));
+          resultBox.appendChild(line);
+          resultBox.appendChild(U.el('button', { class: 'btn sm', style: 'margin-top:6px', text: '✓ 预选此菜', onclick: function () {
+            if (addPreselect(d.id)) { U.toast('已预选：' + d.name); } else { U.toast('已在预选中'); }
+            renderPre(); renderGlobalPre(); refreshCounts();
+          } }));
+        }, 4100);
+      }
+      renderPre();
+      return { pool: pool, renderPre: renderPre };
+    }
+    function countSelected(pool) { var sel = getPreselect(); return pool.filter(function (d) { return sel.indexOf(d.id) > -1; }).length; }
+    var wheels = [
+      makeWheel('meat', '🍖 肉菜转盘', 8),
+      makeWheel('veg', '🥬 青菜转盘', 125),
+      makeWheel('soup', '🍲 汤转盘', 35)
+    ];
+    function refreshCounts() {
+      wheels.forEach(function (w) {
+        // 更新每个转盘标题里的“已抽”数
+      });
+    }
+    wheelSection.appendChild(wheelCard);
+
+    // 总预选区
+    wheelCard.appendChild(U.el('div', { class: 'card-sub', style: 'margin:14px 0 6px;border-top:1px solid var(--line);padding-top:12px', text: '🧺 预选清单（共 ' + getPreselect().length + ' 道）' }));
     wheelCard.appendChild(preBox);
+    function renderGlobalPre() {
+      U.clear(preBox);
+      var arr = getPreselect();
+      wheelCard.querySelector('.card-sub').textContent = '🧺 预选清单（共 ' + arr.length + ' 道）';
+      if (!arr.length) { preBox.appendChild(U.el('span', { class: 'muted', text: '还没有预选，去上面三个转盘转一转吧～' })); return; }
+      arr.forEach(function (id) {
+        var d = findDish(id); if (!d) return;
+        preBox.appendChild(U.el('span', { class: 'tag removable', text: (d.type === 'meat' ? '🍖' : d.type === 'veg' ? '🥬' : '🍲') + d.name, onclick: function () { removePre(id); renderGlobalPre(); wheels.forEach(function (w) { w.renderPre(); }); refreshCounts(); } }));
+      });
+    }
     var genBtn = U.el('button', { class: 'btn ghost sm', style: 'margin-top:10px', text: '📋 一键生成做菜指南', onclick: function () { generateGuide(); } });
     wheelCard.appendChild(genBtn);
-    root.appendChild(wheelCard);
-    renderPreselect(preBox);
+    root.appendChild(wheelSection);
+    renderGlobalPre();
 
     /* ===== 导入菜单 ===== */
     var impCard = U.el('div', { class: 'card', id: 'sec-import' });
@@ -314,35 +309,7 @@ App.pages = App.pages || {};
     impCard.appendChild(previewBox);
     root.appendChild(impCard);
 
-    /* ---------- 转盘逻辑 ---------- */
-    var wheelRot = 0, spinning = false;
-    var pool = WHEEL_IDS.map(findDish).filter(Boolean);
-    var rotG = wheelBox.querySelector('#wheelRot');
-    if (rotG) { rotG.style.transformBox = 'view-box'; rotG.style.transformOrigin = '150px 150px'; }
-    function spinWheel() {
-      if (spinning) return; spinning = true;
-      if (!pool.length) { U.toast('转盘菜品为空'); spinning = false; return; }
-      var N = pool.length, step = 360 / N;
-      var idx = Math.floor(Math.random() * N);
-      var desired = (360 - (idx * step + step / 2)) % 360;
-      var curMod = ((wheelRot % 360) + 360) % 360;
-      var delta = (desired - curMod + 360) % 360;
-      wheelRot += 360 * 5 + delta;
-      rotG.style.transition = 'transform 4s cubic-bezier(.17,.67,.3,1.15)';
-      rotG.style.transform = 'rotate(' + wheelRot + 'deg)';
-      U.clear(resultBox); resultBox.appendChild(U.el('div', { class: 'muted', text: '转动中…' }));
-      setTimeout(function () {
-        spinning = false;
-        var d = pool[idx];
-        U.clear(resultBox);
-        var line = U.el('div', { style: 'font-weight:800;font-size:18px' });
-        line.appendChild(U.el('span', { text: '今天就吃：' }));
-        line.appendChild(U.el('span', { style: 'color:var(--brand)', text: d.name }));
-        resultBox.appendChild(line);
-        resultBox.appendChild(U.el('button', { class: 'btn sm', style: 'margin-top:8px', text: '✓ 预选此菜', onclick: function () { addPreselect(d.id); U.toast('已加入预选：' + d.name); } }));
-      }, 4100);
-    }
-
+    /* ---------- 渲染函数 ---------- */
     function renderGrid(catId, gridEl) {
       U.clear(gridEl);
       var list = RECIPES.concat(getImported());
@@ -382,27 +349,9 @@ App.pages = App.pages || {};
       U.modal({
         title: d.name, body: body,
         actions: [
-          { label: '加入预选', primary: true, onClick: function () { addPreselect(d.id); U.toast('已加入预选'); } },
+          { label: '加入预选', primary: true, onClick: function () { if (addPreselect(d.id)) { U.toast('已加入预选'); } else { U.toast('已在预选中'); } renderGlobalPre(); wheels.forEach(function (w) { w.renderPre(); }); } },
           { label: '关闭', onClick: function () {} }
         ]
-      });
-    }
-
-    function addPreselect(id) {
-      var arr = getPreselect();
-      if (arr.indexOf(id) > -1) { U.toast('已在预选中'); return; }
-      arr.push(id); setPreselect(arr); renderPreselect(preBox);
-    }
-    function renderPreselect(box) {
-      U.clear(box);
-      var arr = getPreselect();
-      if (!arr.length) { box.appendChild(U.el('span', { class: 'muted', text: '还没有预选，去转盘或菜品里加点菜吧～' })); return; }
-      arr.forEach(function (id) {
-        var d = findDish(id); if (!d) return;
-        var chip = U.el('span', { class: 'tag removable', text: d.name, onclick: function () {
-          var a = getPreselect().filter(function (x) { return x !== id; }); setPreselect(a); renderPreselect(box);
-        } });
-        box.appendChild(chip);
       });
     }
 
@@ -410,47 +359,66 @@ App.pages = App.pages || {};
       var arr = getPreselect();
       if (!arr.length) { U.toast('请先预选至少一道菜'); return; }
       var dishes = arr.map(findDish).filter(Boolean);
+      var groups = [['meat', '🍖 肉菜'], ['veg', '🥬 青菜'], ['soup', '🍲 汤'], ['other', '📎 其他']];
       var body = U.el('div');
       var actions = U.el('div', { class: 'row', style: 'margin-bottom:10px' });
       actions.appendChild(U.el('button', { class: 'btn sm', text: '📋 复制全文', onclick: function () { copyText(buildGuideText(dishes)); } }));
       actions.appendChild(U.el('button', { class: 'btn ghost sm', text: '⬇ 下载TXT', onclick: function () { U.download('做菜指南_' + S.todayStr() + '.txt', buildGuideText(dishes), 'text/plain;charset=utf-8'); } }));
       actions.appendChild(U.el('button', { class: 'btn ghost sm', text: '⭐ 存到灵感', onclick: function () { saveToInspiration(dishes); } }));
       body.appendChild(actions);
-      dishes.forEach(function (d, i) {
-        body.appendChild(U.el('div', { style: 'font-weight:800;font-size:16px;margin:12px 0 6px', text: (i + 1) + '. ' + d.name }));
-        body.appendChild(U.el('img', { src: dishImage(d), style: 'width:100%;border-radius:10px;margin-bottom:8px;background:var(--surface-3)', onerror: function () { this.src = ph(d.name, d.hue); } }));
-        if (d.ingredients && d.ingredients.length) body.appendChild(U.el('div', { class: 'muted', style: 'font-size:13px', text: '食材：' + d.ingredients.join('、') }));
-        if (d.steps && d.steps.length) {
-          d.steps.forEach(function (s, k) { body.appendChild(U.el('div', { style: 'margin:3px 0', text: (k + 1) + ') ' + s })); });
-        } else if (d.text) {
-          body.appendChild(U.el('div', { style: 'white-space:pre-wrap;line-height:1.6', text: d.text }));
-        }
-        if (d.sourceUrl) body.appendChild(U.el('a', { class: 'muted', style: 'font-size:12px;display:block;margin-top:4px', href: d.sourceUrl, target: '_blank', rel: 'noopener', text: '🔗 原链接' }));
+      groups.forEach(function (g) {
+        var list = dishes.filter(function (d) { return g[0] === 'other' ? (d.type !== 'meat' && d.type !== 'veg' && d.type !== 'soup') : d.type === g[0]; });
+        if (!list.length) return;
+        body.appendChild(U.el('div', { style: 'font-weight:800;font-size:15px;margin:14px 0 6px;border-top:1px solid var(--line);padding-top:10px', text: g[1] + '（' + list.length + '）' }));
+        list.forEach(function (d, i) {
+          body.appendChild(U.el('div', { style: 'font-weight:700;font-size:14px;margin:8px 0 4px', text: (i + 1) + '. ' + d.name }));
+          body.appendChild(U.el('img', { src: dishImage(d), style: 'width:100%;border-radius:10px;margin-bottom:8px;background:var(--surface-3)', onerror: function () { this.src = ph(d.name, d.hue); } }));
+          if (d.ingredients && d.ingredients.length) body.appendChild(U.el('div', { class: 'muted', style: 'font-size:13px', text: '食材：' + d.ingredients.join('、') }));
+          if (d.steps && d.steps.length) {
+            d.steps.forEach(function (s, k) { body.appendChild(U.el('div', { style: 'margin:3px 0', text: (k + 1) + ') ' + s })); });
+          } else if (d.text) {
+            body.appendChild(U.el('div', { style: 'white-space:pre-wrap;line-height:1.6', text: d.text }));
+          }
+          if (d.sourceUrl) body.appendChild(U.el('a', { class: 'muted', style: 'font-size:12px;display:block;margin-top:4px', href: d.sourceUrl, target: '_blank', rel: 'noopener', text: '🔗 原链接' }));
+        });
       });
       U.modal({ title: '今日做菜指南', body: body, actions: [{ label: '关闭', primary: true, onClick: function () {} }] });
     }
 
     function buildGuideText(dishes) {
-      var d0 = new Date();
-      var head = '今日做菜指南（生成于 ' + S.todayStr() + ' ' + U.fmtTime(d0) + '）\n' + '='.repeat(24) + '\n';
-      return head + dishes.map(function (d, i) {
-        var lines = [(i + 1) + '. ' + d.name];
-        if (d.ingredients && d.ingredients.length) lines.push('【食材】' + d.ingredients.join('、'));
-        if (d.steps && d.steps.length) lines.push('【做法】\n' + d.steps.map(function (s, k) { return '  ' + (k + 1) + ') ' + s; }).join('\n'));
-        else if (d.text) lines.push('【原文】\n' + d.text);
-        if (d.sourceUrl) lines.push('原链接：' + d.sourceUrl);
-        return lines.join('\n');
-      }).join('\n' + '-'.repeat(24) + '\n');
+      var head = '今日做菜指南（生成于 ' + S.todayStr() + ' ' + U.fmtTime(new Date()) + '）\n' + '='.repeat(24) + '\n';
+      var groups = [['meat', '肉菜'], ['veg', '青菜'], ['soup', '汤'], ['other', '其他']];
+      var parts = groups.map(function (g) {
+        var list = dishes.filter(function (d) { return g[0] === 'other' ? (d.type !== 'meat' && d.type !== 'veg' && d.type !== 'soup') : d.type === g[0]; });
+        if (!list.length) return '';
+        var block = '【' + g[1] + '】\n' + list.map(function (d, i) {
+          var lines = [(i + 1) + '. ' + d.name];
+          if (d.ingredients && d.ingredients.length) lines.push('  食材：' + d.ingredients.join('、'));
+          if (d.steps && d.steps.length) lines.push('  做法：\n' + d.steps.map(function (s, k) { return '    ' + (k + 1) + ') ' + s; }).join('\n'));
+          else if (d.text) lines.push('  原文：\n' + d.text);
+          if (d.sourceUrl) lines.push('  原链接：' + d.sourceUrl);
+          return lines.join('\n');
+        }).join('\n');
+        return block;
+      }).filter(Boolean);
+      return head + parts.join('\n' + '-'.repeat(24) + '\n');
+    }
+
+    function copyText(t) {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function () { U.toast('已复制全文'); }, function () { fallbackCopy(t); });
+      else fallbackCopy(t);
+    }
+    function fallbackCopy(t) {
+      try { var ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); U.toast('已复制全文'); } catch (e) { U.toast('复制失败，请手动选择'); }
     }
 
     function saveToInspiration(dishes) {
       try {
         var arr = S.getInspirations ? S.getInspirations() : [];
         var d = new Date();
-        var hhmm = U.fmtTime(d);
         arr.unshift({
           id: U.uid(), content: buildGuideText(dishes), tags: ['菜谱', '做菜指南'],
-          date: S.todayStr(), time: hhmm, pinned: false, starred: false, attachments: []
+          date: S.todayStr(), time: U.fmtTime(d), pinned: false, starred: false, attachments: []
         });
         if (S.saveInspirations) S.saveInspirations(arr);
         U.toast('已存入灵感记录，可在「灵感记录」查看');
@@ -521,7 +489,7 @@ App.pages = App.pages || {};
     }
   };
 
-  /* ---------- 转盘 SVG 构建 ---------- */
+  /* ---------- 转盘 SVG 构建（接收菜品池） ---------- */
   function polar(cx, cy, r, deg) {
     var a = (deg - 90) * Math.PI / 180;
     return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
@@ -532,27 +500,21 @@ App.pages = App.pages || {};
     return 'M' + cx + ' ' + cy + ' L' + p0.x.toFixed(2) + ' ' + p0.y.toFixed(2)
       + ' A' + r + ' ' + r + ' 0 ' + large + ' 1 ' + p1.x.toFixed(2) + ' ' + p1.y.toFixed(2) + ' Z';
   }
-  function buildWheelSVG() {
-    var pool = WHEEL_IDS.map(function (id) {
-      var f = RECIPES.filter(function (r) { return r.id === id; })[0]; return f;
-    }).filter(Boolean);
+  function buildWheelSVG(pool, hue) {
     var N = pool.length, step = 360 / N;
-    var palette = ['#f45c6d', '#f5871f', '#f5a623', '#3abf7c', '#1db5bd', '#4f6cf7', '#8b6cf7', '#ec6fae', '#ef4848', '#1aad6b', '#f5a623', '#4f6cf7'];
-    var s = "<svg viewBox='0 0 300 300' width='300' height='300'>";
-    s += "<g id='wheelRot'>";
+    var s = "<svg viewBox='0 0 200 200' width='200' height='200'>";
+    s += "<g class='wheelRot'>";
     for (var i = 0; i < N; i++) {
       var a0 = i * step, a1 = (i + 1) * step;
-      s += "<path d='" + sectorPath(150, 150, 140, a0, a1) + "' fill='" + palette[i % palette.length] + "' stroke='#fff' stroke-width='1.5'/>";
-      var mid = a0 + step / 2;
-      var pos = polar(150, 150, 92, mid);
-      var nm = pool[i].name; if (nm.length > 5) nm = nm.slice(0, 5) + '…';
-      s += "<text x='" + pos.x.toFixed(1) + "' y='" + pos.y.toFixed(1) + "' transform='rotate(" + mid + ' ' + pos.x.toFixed(1) + ' ' + pos.y.toFixed(1) + ")' font-size='9' fill='#fff' text-anchor='middle' dominant-baseline='middle'>" + nm + '</text>';
+      var light = 32 + (i % 3) * 9;
+      s += "<path d='" + sectorPath(100, 100, 95, a0, a1) + "' fill='hsl(" + hue + ',55%,' + light + "%)' stroke='#fff' stroke-width='1'/>";
+      var mid = a0 + step / 2, pos = polar(100, 100, 62, mid), nm = pool[i].name;
+      if (nm.length > 4) nm = nm.slice(0, 4) + '…';
+      s += "<text x='" + pos.x.toFixed(1) + "' y='" + pos.y.toFixed(1) + "' transform='rotate(" + mid + ' ' + pos.x.toFixed(1) + ' ' + pos.y.toFixed(1) + ")' font-size='8' fill='#fff' text-anchor='middle' dominant-baseline='middle'>" + nm + '</text>';
     }
     s += "</g>";
-    // 中心轴
-    s += "<circle cx='150' cy='150' r='20' fill='#fff' stroke='#e8ecf4' stroke-width='2'/>";
-    // 顶部指针（固定）
-    s += "<path d='M150 4 L141 24 L159 24 Z' fill='#ef4848'/>";
+    s += "<circle cx='100' cy='100' r='14' fill='#fff' stroke='#e8ecf4' stroke-width='2'/>";
+    s += "<path d='M100 4 L93 20 L107 20 Z' fill='#ef4848'/>";
     s += "</svg>";
     return s;
   }
