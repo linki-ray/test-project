@@ -108,6 +108,29 @@ App.pages = App.pages || {};
   }
   var RECIPES = buildAllDishes();
 
+  /* 并入 菜单.docx 补充数据集（泰餐/西餐/川菜/湘菜/东北菜/烘焙） */
+  (function () {
+    var extra = window.__EXTRA_RECIPES__ || [];
+    var seen = {};
+    RECIPES.forEach(function (d) { seen[d.id] = 1; });
+    extra.forEach(function (d) {
+      if (seen[d.id]) {
+        // 同名碰撞：把文档版的菜系/标签合并进内置版，避免丢失分类
+        for (var i = 0; i < RECIPES.length; i++) {
+          if (RECIPES[i].id === d.id) {
+            d.cats.forEach(function (c) { if (RECIPES[i].cats.indexOf(c) < 0) RECIPES[i].cats.push(c); });
+            break;
+          }
+        }
+        return;
+      }
+      seen[d.id] = 1;
+      d.ingredients = ingFor(d.name, d.type);
+      d.steps = stepsFor(d.name, d.type);
+      RECIPES.push(d);
+    });
+  })();
+
   /* ---------- 存储 ---------- */
   var IMPORT_KEY = 'recipes_imported';
   var PRESELECT_KEY = 'recipes_preselect';
