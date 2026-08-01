@@ -410,7 +410,7 @@ App.pages = App.pages || {};
       renderMethod(real);
 
       if (!real) {
-        var fetchBtn = U.el('button', { class: 'btn sm', style: 'margin-top:10px', text: '🔍 联网获取真实做法（下厨房）' });
+        var fetchBtn = U.el('button', { class: 'btn sm', style: 'margin-top:10px', text: '🔍 联网获取真实做法（AI 生成）' });
         fetchBtn.onclick = function () {
           fetchBtn.textContent = '⏳ 搜索中…'; fetchBtn.disabled = true;
           fetch(DISH_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: d.name }) })
@@ -423,12 +423,12 @@ App.pages = App.pages || {};
                 if (fetchBtn.parentNode) fetchBtn.parentNode.removeChild(fetchBtn);
                 U.toast('已获取真实做法');
               } else {
-                fetchBtn.textContent = '🔍 联网获取真实做法（下厨房）'; fetchBtn.disabled = false;
+                fetchBtn.textContent = '🔍 联网获取真实做法（AI 生成）'; fetchBtn.disabled = false;
                 U.toast('联网失败：' + ((res && res.error) || '未找到做法') + '，已显示通用做法');
               }
             })
             .catch(function (e) {
-              fetchBtn.textContent = '🔍 联网获取真实做法（下厨房）'; fetchBtn.disabled = false;
+              fetchBtn.textContent = '🔍 联网获取真实做法（AI 生成）'; fetchBtn.disabled = false;
               U.toast('联网失败：' + (e && e.message ? e.message : e) + '，已显示通用做法');
             });
         };
