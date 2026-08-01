@@ -260,7 +260,7 @@ App.pages = App.pages || {};
     impCard.appendChild(U.el('div', { class: 'card-title', text: '📥 导入菜单' }));
     impCard.appendChild(U.el('div', { class: 'muted', style: 'margin-bottom:10px', text: '粘贴小红书 / 抖音分享链接，自动提取标题、正文与封面图（文字稳、图片可能过期，可用占位兜底）。也可以直接粘贴笔记文字。' }));
 
-    var linkInput = U.el('input', { class: 'input', placeholder: '粘贴链接，如 https://v.douyin.com/xxx 或 https://xhslink.cn/xxx', style: 'margin-bottom:8px' });
+    var linkInput = U.el('input', { class: 'input', placeholder: '粘贴分享链接或整段分享文字，如 沉浸式做抹茶蛋糕… http://xhslink.cn/xxx', style: 'margin-bottom:8px' });
     impCard.appendChild(linkInput);
     var linkRow = U.el('div', { class: 'row' });
     linkRow.appendChild(U.el('button', { class: 'btn sm', text: '解析链接', onclick: function () { parseLink(linkInput.value, previewBox); } }));
@@ -302,7 +302,10 @@ App.pages = App.pages || {};
 
     function showDish(d) {
       var body = U.el('div');
-      if (d.image) body.appendChild(U.el('img', { src: d.image, style: 'width:100%;border-radius:12px;margin-bottom:12px;background:var(--surface-3)' }));
+      var pics = (d.images && d.images.length) ? d.images.slice(0, 8) : (d.image ? [d.image] : []);
+      pics.forEach(function (u) {
+        body.appendChild(U.el('img', { src: u, style: 'width:100%;border-radius:12px;margin-bottom:10px;background:var(--surface-3)', onerror: function () { this.style.display = 'none'; } }));
+      });
       var tags = U.el('div', { class: 'row wrap', style: 'margin-bottom:8px' });
       dishTags(d).forEach(function (t) { tags.appendChild(U.el('span', { class: 'tag xs', text: t })); });
       body.appendChild(tags);
@@ -352,7 +355,10 @@ App.pages = App.pages || {};
           var st = d.steps || [];
           var txt = d.text || '';
           body.appendChild(U.el('div', { style: 'font-weight:700;font-size:14px;margin:8px 0 4px', text: (i + 1) + '. ' + d.name }));
-          if (d.image) body.appendChild(U.el('img', { src: d.image, style: 'width:100%;border-radius:10px;margin-bottom:8px;background:var(--surface-3)' }));
+          var pics = (d.images && d.images.length) ? d.images.slice(0, 8) : (d.image ? [d.image] : []);
+          pics.forEach(function (u) {
+            body.appendChild(U.el('img', { src: u, style: 'width:100%;border-radius:10px;margin-bottom:8px;background:var(--surface-3)', onerror: function () { this.style.display = 'none'; } }));
+          });
           if (ing && ing.length) body.appendChild(U.el('div', { class: 'muted', style: 'font-size:13px', text: '食材：' + ing.join('、') }));
           if (st && st.length) {
             st.forEach(function (s, k) { body.appendChild(U.el('div', { style: 'margin:3px 0', text: (k + 1) + ') ' + s })); });
@@ -426,7 +432,15 @@ App.pages = App.pages || {};
     function buildImportPreview(parsed, sourceUrl, platformLabel) {
       var node = U.el('div', { class: 'import-preview' });
       node.appendChild(U.el('div', { class: 'card-sub', text: '解析结果（' + (platformLabel || '链接') + '）' }));
-      if (parsed.image) node.appendChild(U.el('img', { src: parsed.image, style: 'width:140px;border-radius:10px;margin:6px 0;background:var(--surface-3)', onerror: function () { this.style.display = 'none'; } }));
+      if (parsed.images && parsed.images.length) {
+        var gal = U.el('div', { class: 'row wrap', style: 'gap:6px;margin:6px 0' });
+        parsed.images.slice(0, 8).forEach(function (u) {
+          gal.appendChild(U.el('img', { src: u, style: 'width:84px;height:84px;object-fit:cover;border-radius:8px;background:var(--surface-3)', onerror: function () { this.style.display = 'none'; } }));
+        });
+        node.appendChild(gal);
+      } else if (parsed.image) {
+        node.appendChild(U.el('img', { src: parsed.image, style: 'width:140px;border-radius:10px;margin:6px 0;background:var(--surface-3)', onerror: function () { this.style.display = 'none'; } }));
+      }
       node.appendChild(U.el('div', { style: 'font-weight:800;font-size:15px', text: parsed.title || '未命名' }));
       var guess = guessCat(parsed.title || '');
       var catSel = U.el('select', { class: 'input', style: 'margin:6px 0;max-width:220px;display:block' });
@@ -458,7 +472,7 @@ App.pages = App.pages || {};
       var type = (catId === 'meat' || catId === 'veg' || catId === 'soup') ? catId : 'other';
       var d = {
         id: 'imp-' + U.uid(), name: parsed.title || '未命名菜单', cats: ['imported'].concat(catId ? [catId] : []), type: type,
-        image: parsed.image || '', ingredients: parsed.ingredients || [], steps: parsed.steps || [],
+        image: parsed.image || '', images: parsed.images || [], ingredients: parsed.ingredients || [], steps: parsed.steps || [],
         text: parsed.text || '', video: sourceUrl || '', sourceUrl: sourceUrl || '',
         platformLabel: platformLabel || '', imported: true, hue: 20
       };
@@ -468,15 +482,19 @@ App.pages = App.pages || {};
       renderGrid(sel.value, grid);
     }
 
-    function parseLink(url, pbox) {
-      url = (url || '').trim();
+    function parseLink(raw, pbox) {
+      raw = (raw || '').trim();
+      // 从整段分享文字里自动抠出第一个 http(s) 链接（小红书/抖音分享常带标题前缀）
+      var m = raw.match(/https?:\/\/[^\s"'<>\]]+/i);
+      var url = m ? m[0].replace(/[。，,、.．]+$/, '') : raw;
       if (!url) { U.toast('请先粘贴链接'); return; }
       setPreview('loading', '解析中…');
       fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: url }) }).then(function (resp) { return resp.json(); }).then(function (r) {
         if (!r || !r.ok) { setPreview('error', (r && r.error) ? r.error : '解析失败，请改用粘贴文字'); return; }
         var parsed = parseText(r.text || '');
         parsed.title = r.title || parsed.title;
-        parsed.image = (r.images && r.images[0]) || '';
+        parsed.images = r.images || [];
+        parsed.image = parsed.images[0] || '';
         parsed.text = r.text || '';
         var label = r.platform === 'xiaohongshu' ? '小红书' : (r.platform === 'douyin' ? '抖音' : '链接');
         setPreview('node', '', buildImportPreview(parsed, r.sourceUrl, label));
