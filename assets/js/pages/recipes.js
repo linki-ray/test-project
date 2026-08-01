@@ -46,7 +46,7 @@ App.pages = App.pages || {};
 
   /* ---------- 存储 ---------- */
   var IMPORT_KEY = 'recipes_imported';
-  var PRESELECT_KEY = 'recipes_preselect';
+  var PRESELECT_KEY = 'recipes_preselect_v2'; // 2026-08-02：旧版 doc-1 跨文档重复，升级 key 弃用错乱旧数据
   function getImported() { return S.get(IMPORT_KEY, []); }
   function setImported(a) { S.set(IMPORT_KEY, a); }
   function getPreselect() { return S.get(PRESELECT_KEY, []); }
@@ -237,12 +237,13 @@ App.pages = App.pages || {};
     wheelSection.appendChild(wheelCard);
 
     // 总预选区
-    wheelCard.appendChild(U.el('div', { class: 'card-sub', style: 'margin:14px 0 6px;border-top:1px solid var(--line);padding-top:12px', text: '🧺 预选清单（共 ' + getPreselect().length + ' 道）' }));
+    var globalPreTitle = U.el('div', { class: 'card-sub global-pre-title', style: 'margin:14px 0 6px;border-top:1px solid var(--line);padding-top:12px', text: '🧺 预选清单（共 ' + getPreselect().length + ' 道）' });
+    wheelCard.appendChild(globalPreTitle);
     wheelCard.appendChild(preBox);
     function renderGlobalPre() {
       U.clear(preBox);
       var arr = getPreselect();
-      wheelCard.querySelector('.card-sub').textContent = '🧺 预选清单（共 ' + arr.length + ' 道）';
+      globalPreTitle.textContent = '🧺 预选清单（共 ' + arr.length + ' 道）';
       if (!arr.length) { preBox.appendChild(U.el('span', { class: 'muted', text: '还没有预选，去上面三个转盘转一转吧～' })); return; }
       arr.forEach(function (id) {
         var d = findDish(id); if (!d) return;

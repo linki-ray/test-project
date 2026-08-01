@@ -110,7 +110,6 @@ def parse_doc(path, cuisine, catname, is_baking):
             cats.append(t)
         hue = {'meat': 10, 'veg': 125, 'soup': 200, 'other': 35}[t]
         out.append({
-            'id': 'doc-' + str(len(out) + 1),
             'name': name,
             'type': t,
             'cats': cats,
@@ -127,6 +126,10 @@ for path, cu, cn, bk in FILES:
     ds = parse_doc(path, cu, cn, bk)
     per_file[cu] = ds
     all_dishes.extend(ds)
+
+# 全局唯一 id：避免不同文档都从 doc-1 开始导致 id 冲突
+for idx, d in enumerate(all_dishes, start=1):
+    d['id'] = 'doc-' + str(idx)
 
 # 输出 JS
 js = "window.__EXTRA_RECIPES__ = " + json.dumps(all_dishes, ensure_ascii=False, indent=1) + ";\n"
