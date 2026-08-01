@@ -282,7 +282,8 @@ body {
 .grid.c1 { grid-template-columns: 1fr; }
 .grid.c2 { grid-template-columns: repeat(2, 1fr); }
 .grid.c3 { grid-template-columns: repeat(3, 1fr); }
-@media (max-width: 640px) { .grid.c3 { grid-template-columns: 1fr; } .grid.c2 { grid-template-columns: 1fr; } }
+.grid.c4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 640px) { .grid.c4 { grid-template-columns: repeat(2, 1fr); } .grid.c3 { grid-template-columns: 1fr; } .grid.c2 { grid-template-columns: 1fr; } }
 
 /* 金融行情 */
 .quote-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px dashed var(--line); }

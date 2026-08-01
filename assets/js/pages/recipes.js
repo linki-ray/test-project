@@ -1,18 +1,17 @@
 /* ============================================================
    今日菜谱 —— 分类浏览 / 今日吃什么转盘 / 一键做菜指南 / 导入菜单
-   - 二级类目下拉选分类 → 菜品网格 → 点开看成品图+做法+视频外链
+   - 二级类目下拉选分类 → 菜品网格（一行 4 个、默认仅前 10 道）→ 点开看纯文字做法
    - 今日吃什么：肉菜 / 青菜 / 汤 三个独立转盘，各自多选预选，已选不重复抽取
    - 一键生成做菜指南：按 肉菜 / 青菜 / 汤 分组，每道单独罗列
    - 导入菜单：粘贴小红书/抖音链接经服务端解析（标题+正文+封面），或粘贴文字规则解析
-   - 内置菜谱数据集由真实菜名种子批量生成（肉/青菜/汤 各 100+ 道）
-   - 真实图片优先走「导入菜单」的封面；内置数据用 SVG 占位（离线可用、不破图）
+   - 菜谱数据全部来自 菜单/*.docx 提取（真实菜名/食材/做法，缺内容的空条目不入库）
+   - 纯文字卡片，无图片占位（无图源）
    ========================================================= */
 window.App = window.App || {};
 App.pages = App.pages || {};
 (function () {
   var U = App.U, S = App.Store;
   var API = (window.APP_CONFIG && window.APP_CONFIG.PARSE_API) || 'https://test-project-ek2.pages.dev/api/parse-link';
-  var DISH_API = 'https://test-project-ek2.pages.dev/api/dish-search';
 
   /* ---------- 分类体系（下拉用，type 复用其中 id） ---------- */
   var CATS = [
@@ -36,94 +35,14 @@ App.pages = App.pages || {};
   var catMap = {};
   CATS.forEach(function (g) { g.items.forEach(function (it) { catMap[it.id] = it.name; }); });
 
-  /* ---------- 占位图（离线、不破图，中文可渲染） ---------- */
-  function ph(name, hue) {
-    hue = (hue == null) ? 220 : hue;
-    var bg = 'hsl(' + hue + ',45%,93%)', fg = 'hsl(' + hue + ',55%,32%)';
-    var svg = "<svg xmlns='http://www.w3.org/2000/svg' width='600' height='400'>"
-      + "<rect width='100%' height='100%' fill='" + bg + "'/>"
-      + "<text x='50%' y='50%' font-size='38' fill='" + fg + "' text-anchor='middle' dominant-baseline='middle' font-family='PingFang SC,Microsoft YaHei,sans-serif'>" + (name || '菜品') + "</text>"
-      + "<text x='50%' y='86%' font-size='16' fill='" + fg + "' text-anchor='middle' font-family='PingFang SC,Microsoft YaHei,sans-serif' opacity='0.7'>（示例图·可导入替换）</text>"
-      + "</svg>";
-    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-  }
-
-  /* ---------- 真实菜名种子（逗号分隔，尽量常见） ---------- */
-  var SEED = {
-    meat: "红烧肉,红烧排骨,糖醋排骨,糖醋里脊,咕噜肉,回锅肉,鱼香肉丝,宫保鸡丁,麻婆豆腐,水煮牛肉,水煮鱼,辣子鸡,辣子鸡丁,夫妻肺片,毛血旺,酸菜鱼,剁椒鱼头,烤鱼,粉蒸肉,梅菜扣肉,东坡肉,叉烧,蜜汁叉烧,烤鸭,北京烤鸭,盐水鸭,啤酒鸭,白切鸡,盐焗鸡,口水鸡,文昌鸡,叫花鸡,三杯鸡,可乐鸡翅,炸鸡翅,红烧鸡翅,香菇滑鸡,黄焖鸡,大盘鸡,椒盐排条,锅包肉,京酱肉丝,青椒肉丝,蒜薹炒肉,木耳炒肉,荷兰豆炒腊肉,尖椒炒肉,红烧狮子头,四喜丸子,清蒸鲈鱼,红烧鱼块,干烧鱼,香煎带鱼,红烧带鱼,油焖大虾,白灼虾,椒盐虾,蒜蓉粉丝蒸虾,清蒸螃蟹,香辣蟹,红烧牛腩,番茄牛腩,土豆炖牛肉,黑椒牛柳,滑蛋牛肉,孜然牛肉,葱爆羊肉,红烧羊肉,烤羊排,羊肉串,萝卜炖羊肉,红烧猪蹄,卤猪蹄,酱牛肉,卤牛肉,红烧鸡块,香菇炖鸡,板栗烧鸡,照烧鸡腿,炸猪排,红烧丸子,小炒黄牛肉,干锅肥肠,干锅牛蛙,干锅虾,爆炒腰花,咖喱鸡,咖喱牛肉,咖喱虾,椰香咖喱鸡,照烧猪肉,铁板牛肉,黑椒猪排,蜜汁烤肉,烤五花肉,红烧鸡爪,卤鸡爪,泡椒凤爪,藤椒鸡,蒜香骨,豉汁排骨,南瓜蒸排骨,萝卜焖排骨,红烧大虾,香辣虾,孜然羊肉,烤牛肉,煎牛排,黑椒牛排,牛肉饼,鸡肉卷,炸鸡,烤鸡腿,卤鸡腿,白灼鱿鱼,辣炒花蛤,蒜蓉粉丝蒸扇贝,清蒸石斑鱼,香煎龙利鱼,番茄鱼片,酸汤鱼,水煮鱼片,麻辣香锅,干锅菜花,回锅香肠,腊味炒饭,腊肉炒蒜苔,咸肉菜饭,香肠炒蛋,培根炒蛋,火腿炒蛋,午餐肉炒蛋,蒜香排骨,红烧鸡心,卤鸡翅,蜜汁鸡翅,照烧鸡翅,香酥鸡,盐酥鸡,炸鸡排,糖醋鱼块,茄汁大虾,清蒸多宝鱼,剁椒蒸排骨,粉蒸排骨,芋头蒸排骨,梅菜扣肉,南乳扣肉,红烧肉丸,京都排骨,橙汁排骨,红烧牛尾,番茄炖牛尾,萝卜炖牛腩,土豆烧牛肉,红烧海参,油焖大虾,蒜蓉蒸虾,白灼基围虾,椒盐九肚鱼,红烧带鱼,干炸带鱼,香煎银鳕鱼,清蒸鳕鱼,红烧鳕鱼,烤秋刀鱼,照烧鸡腿排,黑椒鸡腿,香菇蒸鸡,手撕鸡,怪味鸡,棒棒鸡,钵钵鸡,干锅鸡,魔芋烧鸭,腊味拼盘,咸蛋黄焗虾,金沙玉米虾仁,黑椒鸡肉肠,台式三杯鸡,泰式柠檬鱼,香茅烤鸡,菠萝咕噜肉,蜜汁烤排骨,照烧鸡排,葱油鸡,白切鸡,盐焗鸡,口水鸡,藤椒鸡,辣子鸡,干锅鸡,泰式炒河粉,绿咖喱鸡,红咖喱牛肉,泰式打抛猪,咖喱蟹,泰式春卷,玛格丽特披萨,夏威夷披萨,意式肉酱面,奶油培根意面,西冷牛排,惠灵顿牛排,红酒炖牛肉,烤鸡翅,洋葱圈,薯条,法式吐司,黑椒牛排,芝士焗龙虾,香草烤鸡,番茄炖牛腩,罗勒炒鸡,锅包肉,猪肉炖粉条,杀猪菜,酸菜白肉,溜肉段,东北乱炖,酱骨头,烤冷面,铁锅炖鱼,大拉皮,小鸡炖蘑菇,得莫利炖鱼,李连贵熏肉,东北春饼,酸菜血肠,熘肥肠,雪衣豆沙",
-    veg: "蒜蓉菠菜,清炒菠菜,蒜蓉西兰花,清炒西兰花,干煸四季豆,清炒四季豆,地三鲜,凉拌黄瓜,拍黄瓜,凉拌木耳,凉拌海带,凉拌腐竹,凉拌藕片,凉拌土豆丝,酸辣土豆丝,醋溜土豆丝,红烧茄子,鱼香茄子,尖椒土豆丝,清炒土豆丝,干锅土豆,蚝油生菜,蒜蓉生菜,清炒油麦菜,蒜蓉空心菜,清炒空心菜,上汤娃娃菜,醋溜白菜,手撕包菜,清炒包菜,干锅包菜,西红柿炒鸡蛋,番茄炒蛋,青椒炒蛋,韭黄炒蛋,苦瓜炒蛋,西葫芦炒蛋,葱花炒蛋,清炒丝瓜,蒜蓉丝瓜,清炒冬瓜,虾仁冬瓜,红烧冬瓜,清炒芦笋,白灼芦笋,蒜蓉西葫芦,清炒西葫芦,香菇青菜,蒜蓉娃娃菜,清炒小白菜,上汤菠菜,凉拌秋葵,清炒秋葵,蒜蓉秋葵,干煸豆角,虎皮青椒,酱爆青椒,清炒藕片,醋溜藕片,糖醋藕片,清炒山药,蓝莓山药,拔丝山药,清炒荷兰豆,蒜蓉荷兰豆,腊味荷兰豆,清炒豆芽,醋溜豆芽,凉拌豆芽,凉拌芹菜,西芹百合,腰果西芹,清炒莴笋,蒜蓉莴笋,凉拌莴笋,皮蛋拌豆腐,香椿炒蛋,韭菜炒蛋,韭香豆腐,红烧豆腐,家常豆腐,铁板豆腐,照烧豆腐,清炒芥蓝,白灼芥蓝,蒜蓉芥蓝,清炒茼蒿,凉拌茼蒿,蒜蓉红苋菜,清炒红苋菜,上汤苋菜,凉拌粉皮,清炒笋干,油焖笋,香菇菜心,蒜蓉菜心,白灼菜心,清炒苦瓜,苦瓜酿肉,凉拌苦瓜,清炒南瓜,咸蛋黄南瓜,蒜蓉粉丝蒸娃娃菜,烤茄子,芝士焗红薯,拔丝地瓜,清炒红薯叶,凉拌折耳根,橄榄油炒杂蔬,红烧日本豆腐,蟹黄豆腐,小葱拌豆腐,凉拌豆腐,清炒银耳,白灼秋葵,蒜蓉荷兰豆,清炒芦笋,凉拌蕨菜,清炒莴笋丝,酸辣藕带,凉拌海白菜,蒜蓉盖菜,清炒盖菜,白灼生菜,蚝油蘑菇,清炒口蘑,香菇炒油菜,蒜蓉油菜,凉拌马齿苋,清炒南瓜藤,上汤西洋菜,蒜蓉西洋菜,清炒空心菜梗,凉拌紫甘蓝,醋溜紫甘蓝,清炒紫甘蓝,干锅花菜,清炒花菜,蒜蓉花菜,番茄花菜,凉拌西兰花,白灼西兰花,蒜蓉西蓝花,清炒豆苗,上汤豆苗,蒜蓉豆苗,凉拌海带丝,凉拌黄瓜木耳,拍黄瓜,蒜泥白肉,虎皮尖椒,酱爆茄子,鱼香茄子煲,烧茄子,酱茄子,蒜蓉茄子,烤茄子,芝士焗茄子,凉拌豆腐皮,凉拌千张,韭菜炒香干,芹菜炒香干,雪菜炒毛豆,清炒毛豆,凉拌毛豆,盐水毛豆,清炒蚕豆,凉拌蚕豆,蒜蓉荷兰豆,清炒豌豆,凉拌豌豆,清炒扁豆,干煸扁豆,清炒刀豆,白灼芥蓝,上汤竹荪,清炒竹荪,蒜蓉木耳菜,清炒木耳菜,凉拌蕨根粉,清炒魔芋,凉拌魔芋,金针菇拌黄瓜,凉拌金针菇,蒜蓉金针菇,清炒香菇,香菇西兰花,白灼菜心,上汤娃娃菜,蒜蓉粉丝蒸丝瓜,烤红薯,芝士焗土豆,清炒藕片,凉拌折耳根,烧烤蔬菜,杂蔬沙拉,凯撒沙拉,蔬菜沙拉,凉拌时蔬,清炒时蔬,上汤时蔬,蒜蓉时蔬,清炒杂菜,醋溜白菜,酸辣白菜,干锅白菜,韩式泡菜,酸菜炒粉,地三鲜,凉拌魔芋丝,清炒西芹,腰果西芹百合,凉拌莴笋丝,清炒芦笋尖,烤蔬菜,清炒南瓜尖,上汤竹笙,凉拌海白菜,蒜蓉红薯叶,清炒红菜苔,腊肉炒笋,干锅手撕包菜,青木瓜沙拉,泰式炒空心菜,希腊沙拉,番茄意面,烤蔬菜,芦笋沙拉,牛油果沙拉,焗薯泥,奶油菠菜,橄榄油烤番茄,香草烤蘑菇,玉米烙,地三鲜,东北酱茄子,尖椒干豆腐,酸菜粉,蒜茄子,土豆炖豆角",
-    soup: "西红柿鸡蛋汤,紫菜蛋花汤,丝瓜豆腐汤,冬瓜排骨汤,莲藕排骨汤,玉米排骨汤,山药排骨汤,萝卜排骨汤,海带排骨汤,土豆排骨汤,菌菇汤,香菇鸡汤,椰子鸡汤,老母鸡汤,乌鸡汤,鸽子汤,鲫鱼汤,豆腐鲫鱼汤,酸菜鱼汤,番茄鱼片汤,丸子汤,鸡肉丸子汤,牛肉丸子汤,西湖牛肉羹,粟米羹,海鲜羹,鲜虾豆腐汤,虾仁豆腐汤,蛤蜊汤,花蛤豆腐汤,蛏子汤,海带豆腐汤,味噌汤,日式味噌汤,韩式大酱汤,泡菜汤,罗宋汤,奶油蘑菇汤,南瓜奶油汤,玉米浓汤,番茄浓汤,冬瓜虾仁汤,白萝卜汤,山药木耳汤,银耳莲子羹,雪梨银耳羹,红豆汤,绿豆汤,八宝粥,皮蛋瘦肉粥,瘦肉粥,鸡肉粥,海鲜粥,艇仔粥,鱼片粥,南瓜小米粥,红枣银耳汤,木瓜银耳汤,莲藕汤,茶树菇鸡汤,竹荪鸡汤,虫草花鸡汤,山药枸杞鸡汤,当归羊肉汤,萝卜羊肉汤,羊肉汤,牛尾汤,番茄牛腩汤,酸辣汤,豆腐汤,鸡蛋汤,青菜豆腐汤,菠菜蛋汤,蘑菇汤,金针菇汤,海鲜酸辣汤,鱼头豆腐汤,木瓜鲫鱼汤,通草鲫鱼汤,花生猪蹄汤,黄豆猪蹄汤,猪蹄汤,排骨莲藕汤,排骨玉米汤,排骨山药汤,排骨海带汤,排骨萝卜汤,排骨苦瓜汤,排骨冬瓜汤,排骨菌菇汤,排骨土豆汤,排骨番茄汤,排骨芋头汤,排骨腐竹汤,一品锅,佛跳墙,瓦罐鸡汤,瓦罐排骨汤,瓦罐鸭汤,瓦罐鸽子汤,瓦罐牛肉汤,瓦罐素汤,瓦罐菌汤,瓦罐豆腐汤,瓦罐鱼汤,酸汤鱼,酸汤肥牛,胡辣汤,河南胡辣汤,逍遥胡辣汤,疙瘩汤,面疙瘩汤,鸡蛋疙瘩汤,紫菜虾皮汤,虾皮萝卜汤,虾皮冬瓜汤,榨菜肉丝汤,肉丝汤,豆腐肉丝汤,番茄豆腐汤,番茄蛋汤,菠菜豆腐汤,小白菜豆腐汤,金针菇豆腐汤,香菇豆腐汤,平菇汤,杏鲍菇汤,蟹味菇汤,白玉菇汤,杂菌汤,菌王汤,松茸汤,竹笙汤,发菜汤,发菜蚝豉汤,西洋菜蜜枣汤,菜干猪肺汤,霸王花猪骨汤,南北杏猪肺汤,无花果瘦肉汤,苹果瘦肉汤,雪梨瘦肉汤,海底椰鸡汤,椰子乌鸡汤,清补凉汤,五指毛桃汤,土茯苓汤,鸡骨草汤,老黄瓜汤,节瓜汤,佛手瓜汤,凉瓜排骨汤,苦瓜排骨汤,青萝卜汤,白萝卜牛腩汤,白萝卜羊肉汤,红萝卜玉米汤,马蹄甘蔗汤,竹蔗马蹄汤,茅根竹蔗水,夏枯草汤,西洋菜汤,菜干汤,蜜枣瘦肉汤,雪梨猪肺汤,霸王花汤,粉葛汤,赤小豆汤,薏米汤,冬瓜老鸭汤,酸萝卜老鸭汤,笋干老鸭汤,老鸭汤,鸭架汤,鸡汤,大骨汤,筒骨汤,骨头汤,排骨汤,牛肉汤,鱼汤,海鲜汤,素汤,蛋花汤,蔬菜汤,菌汤,瓜汤,根茎汤,甜汤,潮汕砂锅粥,皮蛋瘦肉粥,生滚粥,及第粥,滑鸡粥,瘦肉粥,鱼片粥,虾粥,蟹粥,鲍鱼粥,海参粥,五谷粥,燕麦粥,小米粥,南瓜粥,山药粥,红豆粥,绿豆粥,八宝粥,莲子粥,百合粥,黑米粥,紫米粥,薏米粥,玉米粥,地瓜粥,红薯粥,山药排骨粥,生菜粥,菠菜粥,鸡肉粥,鸭肉粥,牛肉粥,羊肉粥,海鲜粥,蔬菜粥,杂锦粥,状元及第粥,咸蛋瘦肉粥,瑶柱瘦肉粥,干贝瘦肉粥,鲍鱼鸡汤,花胶鸡汤,虫草花炖瘦肉,西洋参鸡汤,党参鸡汤,冬阴功汤,椰汁西米露,芒果西米露,法式洋葱汤,蘑菇浓汤,番茄海鲜汤,蛤蜊浓汤,玉米奶油汤,南瓜奶油汤,罗宋汤,奶油蘑菇汤,泰式椰奶汤,海鲜酸辣汤,东北大骨头汤,酸菜白肉汤",
-  };
-
-  /* 菜系关键词标注（菜名包含其一即归该菜系，取首个命中） */
-  var CUISINE_RULES = [
-    ['sichuan', ['麻婆','水煮','鱼香','宫保','回锅','夫妻','辣子','毛血旺','酸菜鱼','泡椒','藤椒','麻辣','干锅','川']],
-    ['hunan', ['剁椒','腊','尖椒炒肉','东安','永州','湘','烟笋','擂辣椒','腊肉']],
-    ['guangdong', ['白切','盐焗','叉烧','老火','清蒸','上汤','艇仔','广东','烧腊','蜜汁','豉汁','清补凉','椰子鸡','菜干','霸王花','南北杏','无花果','苹果瘦肉','雪梨','海底椰','五指毛桃','鸡骨草','土茯苓','瓦罐','佛跳墙','冬瓜老鸭','老鸭','西洋菜','粉葛','赤小豆','瑶柱','花胶','西洋参','党参','虫草花炖']],
-    ['thai', ['冬阴','咖喱','芒果糯','柠檬','泰式','椰香','青柠','香茅','罗勒','菠萝咕','菠萝','西米','椰汁']],
-    ['western', ['提拉米苏','意式','凯撒','牛排','芝士','奶油','西式','三文鱼','沙拉','戚风','曲奇','香蕉面包','吐司','披萨','汉堡','三明治','松饼','奶昔','焗','烤鸡','薯','罗宋']],
-    ['dongbei', ['锅包','地三鲜','猪肉炖粉条','杀猪菜','酸菜白肉','溜肉段','东北乱炖','酱骨头','烤冷面','铁锅炖','大拉皮','小鸡炖蘑菇','得莫利','李连贵','东北春饼','酸菜血肠','熘肥肠','雪衣豆沙','东北酱茄子','尖椒干豆腐','酸菜粉','蒜茄子','东北大骨头','酸菜白肉汤']]
-  ];
-  function cuisineOf(name) {
-    for (var i = 0; i < CUISINE_RULES.length; i++) {
-      var kw = CUISINE_RULES[i][1];
-      for (var j = 0; j < kw.length; j++) if (name.indexOf(kw[j]) > -1) return CUISINE_RULES[i][0];
-    }
-    return null;
-  }
-  function slug(s) { return String(s).replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, ''); }
-
-  function ingFor(name, type) {
-    var main = name.replace(/[煮炖烧炒蒸烤拌爆煎焖炸卤蜜照铁板手撕怪味棒棒钵钵魔芋柠檬香茅菠萝橙汁金沙咸蛋黄南乳京都为]+/g, '').slice(0, 5) || '主料';
-    var base = [main, '葱姜蒜', '食用油', '盐', '生抽'];
-    if (type === 'meat') base.push('料酒', '老抽', '糖');
-    else if (type === 'veg') base.push('蚝油');
-    else base.push('清水', '姜片', '香油');
-    return base.slice(0, 8);
-  }
-  function stepsFor(name, type) {
-    if (type === 'meat') return ['主料洗净切块，用料酒生抽腌10分钟去腥', '热锅下油，爆香葱姜蒜', '下主料大火翻炒上色', '加生抽老抽糖与适量热水', '加盖中小火焖煮入味，大火收汁出锅'];
-    if (type === 'veg') return ['蔬菜洗净切好，部分食材焯水备用', '热锅少油，爆香蒜末', '下蔬菜大火快速翻炒', '加盐与少许蚝油调味，出锅'];
-    return ['食材处理干净备用', '锅中加足量清水与姜片', '大火烧开撇去浮沫，转小火慢煲', '煲至食材软烂，加盐调味', '出锅前撒葱花淋香油'];
-  }
-
-  function buildAllDishes() {
-    var out = [];
-    Object.keys(SEED).forEach(function (type) {
-      SEED[type].split(',').forEach(function (raw) {
-        var name = raw.trim(); if (!name) return;
-        var id = 'd-' + slug(name);
-        for (var k = 0; k < out.length; k++) if (out[k].id === id) return; // 去重
-        var cats = [type];
-        var cu = cuisineOf(name); if (cu) cats.push(cu);
-        if (/凉拌|沙拉/.test(name)) cats.push('cold');
-        if (/烘焙|蛋糕|饼干|面包|吐司/.test(name)) cats.push('baking');
-        if (/粥/.test(name)) cats.push('breakfast');
-        if (/鸡|鸭|鸽|鹌鹑|禽/.test(name) && !/素|豆腐|蔬/.test(name)) cats.push('poultry');
-        if (/虾|蟹|鱿鱼|扇贝|海参|花蛤|蛤蜊|蛏|带鱼|鳕|石斑|龙利|多宝|鲈|鲳|草鱼|鲫鱼|黄鱼|桂鱼|鳜|鲍|瑶柱|干贝/.test(name)) cats.push('seafood');
-        var hue = type === 'meat' ? (cu === 'thai' ? 35 : cu === 'western' ? 18 : 10) : type === 'veg' ? 125 : 35;
-        out.push({ id: id, name: name, type: type, cats: cats, hue: hue, ingredients: ingFor(name, type), steps: stepsFor(name, type) });
-      });
-    });
-    return out;
-  }
-  var RECIPES = buildAllDishes();
-
-  /* 并入 菜单.docx 精选数据集（50 道日常热门）；文档优先去重：同名删内置版 */
-  (function () {
-    var extra = window.__EXTRA_RECIPES__ || [];
-    var byName = {};
-    RECIPES.forEach(function (d) { byName[d.name] = d; });
-    extra.forEach(function (d) {
-      if (byName[d.name]) {
-        var idx = RECIPES.indexOf(byName[d.name]);
-        if (idx > -1) RECIPES.splice(idx, 1); // 删内置同名，文档版优先
-      }
-      d.ingredients = ingFor(d.name, d.type);
-      d.steps = stepsFor(d.name, d.type);
-      RECIPES.push(d);
-    });
-  })();
+  /* 菜谱数据来自 菜单/*.docx 提取（scripts/gen_recipes.py 生成 recipes-extra.js），真实菜名/食材/做法 */
+  var RECIPES = (window.__EXTRA_RECIPES__ || []).map(function (d) {
+    return {
+      id: d.id, name: d.name, type: d.type, cats: d.cats,
+      hue: (d.hue == null ? 0 : d.hue),
+      ingredients: d.ingredients || [], steps: d.steps || [], text: d.text || ''
+    };
+  });
 
   /* ---------- 存储 ---------- */
   var IMPORT_KEY = 'recipes_imported';
@@ -138,7 +57,6 @@ App.pages = App.pages || {};
     for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i];
     return null;
   }
-  function dishImage(d) { return (d && d.image) ? d.image : ph(d ? d.name : '', d ? d.hue : 220); }
   function dishTags(d) {
     var out = [];
     (d.cats || []).forEach(function (c) { if (c === 'imported') out.push('导入'); else if (catMap[c]) out.push(catMap[c]); });
@@ -194,7 +112,7 @@ App.pages = App.pages || {};
       sel.appendChild(og);
     });
     catsCard.appendChild(sel);
-    var grid = U.el('div', { class: 'grid c3' });
+    var grid = U.el('div', { class: 'grid c4' });
     catsCard.appendChild(grid);
     root.appendChild(catsCard);
     renderGrid('all', grid);
@@ -357,16 +275,14 @@ App.pages = App.pages || {};
     root.appendChild(impCard);
 
     /* ---------- 渲染函数 ---------- */
-    function loadReal(name) {
-      try { return S.get('dish_real_' + name) || null; } catch (e) { return null; }
-    }
-    function saveReal(name, data) {
-      try { S.set('dish_real_' + name, data); } catch (e) {}
-    }
+    /* 做法直接来自文档数据集，不再联网获取 */
     function renderGrid(catId, gridEl) {
       U.clear(gridEl);
-      var list = RECIPES.concat(getImported());
+      var imported = getImported();
+      var total = RECIPES.length + imported.length;
+      var list = RECIPES.concat(imported);
       if (catId && catId !== 'all') list = list.filter(function (d) { return (d.cats || []).indexOf(catId) > -1; });
+      else list = list.slice(0, 10); // 默认只展示前 10 道，其余靠分类筛选
       if (!list.length) { gridEl.appendChild(U.el('div', { class: 'empty', text: '该分类暂无菜品' })); return; }
       list.forEach(function (d) {
         var card = U.el('div', { class: 'dish-card', onclick: function () { showDish(d); } });
@@ -378,6 +294,9 @@ App.pages = App.pages || {};
         card.appendChild(info);
         gridEl.appendChild(card);
       });
+      if ((!catId || catId === 'all') && total > 10) {
+        gridEl.appendChild(U.el('div', { class: 'muted', style: 'grid-column:1/-1;margin-top:6px;font-size:12px', text: '仅展示前 10 道，选择上方分类可查看该分类全部 ' + total + ' 道菜品。' }));
+      }
     }
 
     function showDish(d) {
@@ -387,52 +306,20 @@ App.pages = App.pages || {};
       dishTags(d).forEach(function (t) { tags.appendChild(U.el('span', { class: 'tag xs', text: t })); });
       body.appendChild(tags);
 
-      var real = loadReal(d.name);
       var methodBox = U.el('div');
       body.appendChild(methodBox);
-      function renderMethod(data) {
-        U.clear(methodBox);
-        var ing = (data && data.ingredients && data.ingredients.length) ? data.ingredients : d.ingredients;
-        var st = (data && data.steps && data.steps.length) ? data.steps : d.steps;
-        var txt = (data && data.text) ? data.text : d.text;
-        if (ing && ing.length) {
-          methodBox.appendChild(U.el('div', { class: 'card-sub', style: 'margin:6px 0 4px', text: '🥬 食材' }));
-          methodBox.appendChild(U.el('div', { text: ing.join('、') }));
-        }
-        if (st && st.length) {
-          methodBox.appendChild(U.el('div', { class: 'card-sub', style: 'margin:10px 0 4px', text: '👩‍🍳 做法' }));
-          st.forEach(function (s, i) { methodBox.appendChild(U.el('div', { style: 'margin:4px 0', text: (i + 1) + '. ' + s })); });
-        } else if (txt) {
-          methodBox.appendChild(U.el('div', { class: 'card-sub', style: 'margin:10px 0 4px', text: '📝 原文' }));
-          methodBox.appendChild(U.el('div', { style: 'white-space:pre-wrap;line-height:1.6', text: txt }));
-        }
+      if (d.ingredients && d.ingredients.length) {
+        methodBox.appendChild(U.el('div', { class: 'card-sub', style: 'margin:6px 0 4px', text: '🥬 食材' }));
+        methodBox.appendChild(U.el('div', { text: d.ingredients.join('、') }));
       }
-      renderMethod(real);
-
-      if (!real) {
-        var fetchBtn = U.el('button', { class: 'btn sm', style: 'margin-top:10px', text: '🔍 联网获取真实做法（AI 生成）' });
-        fetchBtn.onclick = function () {
-          fetchBtn.textContent = '⏳ 搜索中…'; fetchBtn.disabled = true;
-          fetch(DISH_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: d.name }) })
-            .then(function (r) { return r.json(); })
-            .then(function (res) {
-              if (res && res.ok && ((res.ingredients && res.ingredients.length) || (res.steps && res.steps.length))) {
-                saveReal(d.name, { ingredients: res.ingredients || [], steps: res.steps || [] });
-                d.real = true; d.ingredients = res.ingredients || d.ingredients; d.steps = res.steps || d.steps;
-                renderMethod(res);
-                if (fetchBtn.parentNode) fetchBtn.parentNode.removeChild(fetchBtn);
-                U.toast('已获取真实做法');
-              } else {
-                fetchBtn.textContent = '🔍 联网获取真实做法（AI 生成）'; fetchBtn.disabled = false;
-                U.toast('联网失败：' + ((res && res.error) || '未找到做法') + '，已显示通用做法');
-              }
-            })
-            .catch(function (e) {
-              fetchBtn.textContent = '🔍 联网获取真实做法（AI 生成）'; fetchBtn.disabled = false;
-              U.toast('联网失败：' + (e && e.message ? e.message : e) + '，已显示通用做法');
-            });
-        };
-        body.appendChild(fetchBtn);
+      if (d.steps && d.steps.length) {
+        methodBox.appendChild(U.el('div', { class: 'card-sub', style: 'margin:10px 0 4px', text: '👩‍🍳 做法' }));
+        d.steps.forEach(function (s, i) { methodBox.appendChild(U.el('div', { style: 'margin:4px 0', text: (i + 1) + '. ' + s })); });
+      } else if (d.text) {
+        methodBox.appendChild(U.el('div', { class: 'card-sub', style: 'margin:10px 0 4px', text: '📝 原文' }));
+        methodBox.appendChild(U.el('div', { style: 'white-space:pre-wrap;line-height:1.6', text: d.text }));
+      } else {
+        methodBox.appendChild(U.el('div', { class: 'muted', style: 'margin-top:8px', text: '（暂无详细做法）' }));
       }
       if (d.video) body.appendChild(U.el('a', { class: 'btn sm', style: 'margin-top:12px;display:inline-block;text-decoration:none', href: d.video, target: '_blank', rel: 'noopener', text: '▶ 看视频' }));
       U.modal({
@@ -460,10 +347,9 @@ App.pages = App.pages || {};
         if (!list.length) return;
         body.appendChild(U.el('div', { style: 'font-weight:800;font-size:15px;margin:14px 0 6px;border-top:1px solid var(--line);padding-top:10px', text: g[1] + '（' + list.length + '）' }));
         list.forEach(function (d, i) {
-          var real = loadReal(d.name);
-          var ing = (real && real.ingredients && real.ingredients.length) ? real.ingredients : d.ingredients;
-          var st = (real && real.steps && real.steps.length) ? real.steps : d.steps;
-          var txt = (real && real.text) ? real.text : d.text;
+          var ing = d.ingredients || [];
+          var st = d.steps || [];
+          var txt = d.text || '';
           body.appendChild(U.el('div', { style: 'font-weight:700;font-size:14px;margin:8px 0 4px', text: (i + 1) + '. ' + d.name }));
           if (d.image) body.appendChild(U.el('img', { src: d.image, style: 'width:100%;border-radius:10px;margin-bottom:8px;background:var(--surface-3)' }));
           if (ing && ing.length) body.appendChild(U.el('div', { class: 'muted', style: 'font-size:13px', text: '食材：' + ing.join('、') }));
@@ -485,10 +371,9 @@ App.pages = App.pages || {};
         var list = dishes.filter(function (d) { return g[0] === 'other' ? (d.type !== 'meat' && d.type !== 'veg' && d.type !== 'soup') : d.type === g[0]; });
         if (!list.length) return '';
         var block = '【' + g[1] + '】\n' + list.map(function (d, i) {
-          var real = loadReal(d.name);
-          var ing = (real && real.ingredients && real.ingredients.length) ? real.ingredients : d.ingredients;
-          var st = (real && real.steps && real.steps.length) ? real.steps : d.steps;
-          var txt = (real && real.text) ? real.text : d.text;
+          var ing = d.ingredients || [];
+          var st = d.steps || [];
+          var txt = d.text || '';
           var lines = [(i + 1) + '. ' + d.name];
           if (ing && ing.length) lines.push('  食材：' + ing.join('、'));
           if (st && st.length) lines.push('  做法：\n' + st.map(function (s, k) { return '    ' + (k + 1) + ') ' + s; }).join('\n'));
