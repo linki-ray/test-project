@@ -30,17 +30,20 @@
           <span class="nav-ico-wrap"><svg viewBox="0 0 24 24" class="nav-ico"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></span>
           <span>爆款视频</span>
         </button>
-        <button class="nav-item" data-page="vv-analyzer" data-color="red">
-          <span class="nav-ico-wrap"><svg viewBox="0 0 24 24" class="nav-ico"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></span>
-          <span>视频解析</span>
-        </button>
+        <div class="nav-group" data-group="video" data-pages="vv-analyzer,vv-creation">
+          <button class="nav-item nav-group-toggle" data-page="vv-analyzer" data-color="red">
+            <span class="nav-ico-wrap"><svg viewBox="0 0 24 24" class="nav-ico"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></span>
+            <span>视频解析</span>
+            <span class="nav-caret">&#9662;</span>
+          </button>
+          <div class="nav-sub">
+            <button class="nav-sub-item" data-page="vv-analyzer">视频智能解析</button>
+            <button class="nav-sub-item" data-page="vv-creation">爆款二创</button>
+          </div>
+        </div>
         <button class="nav-item" data-page="vv-library" data-color="purple">
-          <span class="nav-ico-wrap"><svg viewBox="0 0 24 24" class="nav-ico"><path d="M3 7l9-4 9 4-9 4-9-4zm0 5l9 4 9-4M3 17l9 4 9-4"/></svg></span>
+          <span class="nav-ico-wrap"><svg viewBox="0 0 24 24" class="nav-ico"><path d="M3 7l9-4 9 4-9-4-9-4zm0 5l9 4 9-4M3 17l9 4 9-4"/></svg></span>
           <span>素材库</span>
-        </button>
-        <button class="nav-item" data-page="vv-creation" data-color="red">
-          <span class="nav-ico-wrap"><svg viewBox="0 0 24 24" class="nav-ico"><path d="M4 4h16v12H5.2L4 17.6V4zm4 4v2h8V8H8zm0 4v2h5v-2H8z"/></svg></span>
-          <span>爆款二创</span>
         </button>
         <button class="nav-item" data-page="daily-advice" data-color="red">
           <span class="nav-ico-wrap"><svg viewBox="0 0 24 24" class="nav-ico"><path d="M12 2l2.4 7.4H22l-6 4.4 2.3 7.2-6.3-4.6L5.7 21l2.3-7.2-6-4.4h7.6z"/></svg></span>
@@ -81,7 +84,8 @@
           <span id="syncPill" class="sync-pill" title="数据存储于本机">● 本地</span>
           <div id="clock" class="clock"></div>
         </div>
-      </header>
+              <nav id="subNav" class="sub-nav"></nav>
+</header>
       <section id="pageRoot" class="page-root"></section>
     </main>
   </div>

@@ -465,3 +465,35 @@ body {
 .shot-table td { color: var(--text); }
 .vv-analysis-tbl td.vv-k { background: var(--surface-2); color: var(--text-2); font-weight: 700; white-space: nowrap; width: 96px; }
 .grid.c1 { display: grid; grid-template-columns: 1fr; gap: 12px; }
+
+
+/* ---------- 视频解析 分组（左侧二级类目） ---------- */
+.nav-group { display: flex; flex-direction: column; }
+.nav-caret { margin-left: auto; font-size: 11px; color: var(--text-3); transition: transform .2s; }
+.nav-group.open > .nav-group-toggle .nav-caret { transform: rotate(180deg); }
+.nav-group.open > .nav-group-toggle { background: var(--surface-2); color: var(--text); font-weight: 700; }
+.nav-sub {
+  display: none; flex-direction: column; gap: 2px;
+  margin: 3px 0 4px 14px; padding-left: 14px;
+  border-left: 2px solid var(--line);
+}
+.nav-group.open > .nav-sub { display: flex; }
+.nav-sub-item {
+  display: block; text-align: left; border: 0; background: none; cursor: pointer;
+  color: var(--text-2); padding: 8px 12px; border-radius: 10px; font-size: 13px;
+}
+.nav-sub-item:hover { background: var(--surface-2); color: var(--text); }
+.nav-sub-item.active { background: var(--nav-red-soft); color: var(--nav-red); font-weight: 700; }
+
+/* ---------- 顶部二级类目 ---------- */
+#topbar { flex-wrap: wrap; padding-bottom: 10px; }
+.sub-nav {
+  flex-basis: 100%; display: flex; gap: 8px; flex-wrap: wrap;
+  margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line);
+}
+.sub-nav-item {
+  border: 1px solid var(--line); background: var(--surface); color: var(--text-2);
+  padding: 6px 16px; border-radius: 999px; font-size: 13px; cursor: pointer; transition: .15s;
+}
+.sub-nav-item:hover { border-color: var(--nav-red); color: var(--nav-red); }
+.sub-nav-item.active { background: var(--nav-red); color: #fff; border-color: var(--nav-red); font-weight: 700; }

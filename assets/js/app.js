@@ -13,14 +13,42 @@
     'recipes': '今日菜谱', 'daily-advice': '今日参谋'
   };
 
+  // 分组（含二级类目）：视频解析 -> [视频智能解析, 爆款二创]
+  var NAV_GROUPS = {
+    'video': ['vv-analyzer', 'vv-creation']
+  };
+
   function navigate(page) {
     current = page;
     U.$all('.nav-item').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-page') === page); });
+    U.$all('.nav-sub-item').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-page') === page); });
+    // 分组展开/收起
+    U.$all('.nav-group').forEach(function (g) {
+      var pages = (g.getAttribute('data-pages') || '').split(',');
+      g.classList.toggle('open', pages.indexOf(page) >= 0);
+    });
     U.$('#pageTitle').textContent = TITLES[page] || '';
+    renderSubNav(page);
     U.$('#nav').classList.remove('open');
     var root = U.$('#pageRoot');
     if (App.pages[page]) App.pages[page](root);
     // 切换页面时重置当天提醒标记（避免跨页重复）
+  }
+
+  // 顶部二级类目：当页面属于某分组时显示横向子导航
+  function renderSubNav(page) {
+    var bar = U.$('#subNav'); if (!bar) return;
+    var key = null;
+    for (var k in NAV_GROUPS) { if (NAV_GROUPS[k].indexOf(page) >= 0) { key = k; break; } }
+    if (!key) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+    bar.style.display = '';
+    bar.innerHTML = '';
+    NAV_GROUPS[key].forEach(function (p) {
+      var b = U.el('button', { class: 'sub-nav-item' + (p === page ? ' active' : '') });
+      b.setAttribute('data-page', p);
+      b.textContent = TITLES[p] || p;
+      bar.appendChild(b);
+    });
   }
 
   /* ---------- 时钟 ---------- */
@@ -185,7 +213,11 @@
 
   /* ---------- 事件绑定 ---------- */
   U.$('#navMenu').addEventListener('click', function (e) {
-    var btn = e.target.closest('.nav-item'); if (!btn) return;
+    var btn = e.target.closest('.nav-item, .nav-sub-item'); if (!btn) return;
+    navigate(btn.getAttribute('data-page'));
+  });
+  U.$('#subNav').addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-page]'); if (!btn) return;
     navigate(btn.getAttribute('data-page'));
   });
   U.$('#openSettings').addEventListener('click', openSettings);
