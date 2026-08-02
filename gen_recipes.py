@@ -10,6 +10,7 @@ FILES = [
     ("C:/Users/Admin/Desktop/菜单/西餐1-50道.docx", "western", "西式", False),
     ("C:/Users/Admin/Desktop/菜单/烘焙大全80道.docx", "baking", "烘焙", True),
     ("C:/Users/Admin/Desktop/菜单/川菜食谱.docx", "sichuan", "四川菜", False),
+    ("C:/Users/Admin/Desktop/菜单/50道家常蔬菜做法 .docx", "veg", "素菜", False),
 ]
 
 TITLE_RE = re.compile(r'^[【\[]?\s*(\d{1,3})[.、)]\s*(.+?)\s*[】\]]?$')
@@ -90,7 +91,11 @@ def parse_doc(path, cuisine, catname, is_baking):
                 cur['block'].append(rem)
         else:
             if cur:
-                cur['block'].append(t)
+                # 同一段落内可能含【食材】\n【做法】\n1. 多行（蔬菜 docx 格式），按换行拆开再入块
+                for ln in t.split('\n'):
+                    ln = ln.strip()
+                    if ln:
+                        cur['block'].append(ln)
     if cur:
         dishes.append(cur)
     out = []
@@ -105,6 +110,8 @@ def parse_doc(path, cuisine, catname, is_baking):
             continue
         seen_titles.add(name)
         t = infer_type(name, is_baking)
+        if cuisine == 'veg' and t != 'soup':
+            t = 'veg'  # 素菜文档统一归 veg（除汤羹），避免菜名不在 VEG 关键词被误判 meat
         cats = [cuisine]
         if t in ('meat', 'veg', 'soup'):
             cats.append(t)

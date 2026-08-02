@@ -224,12 +224,26 @@ function videoCard(it, state) {
   if (it.img) { var im = U.el('img', { src: it.img, style: 'max-width:120px;border-radius:8px;margin-top:8px' }); card.appendChild(im); }
 
   var foot = U.el('div', { class: 'row', style: 'margin-top:10px' });
+  foot.appendChild(U.el('button', { class: 'btn sm', style: 'background:linear-gradient(135deg,#5b8def,#8a5bef);color:#fff;border:none', text: '🎬 二创', onclick: function () { openCreationModal(it); } }));
   var hasDirect = it.url && it.url !== 'https://www.douyin.com/' && it.url !== 'https://www.xiaohongshu.com/';
   foot.appendChild(U.el('button', { class: 'btn ghost sm', text: hasDirect ? '查看原视频' : '🔍 搜原视频', onclick: function () { openOriginal(it); } }));
   foot.appendChild(U.el('button', { class: 'btn ghost sm', text: it.archived ? '已归档' : '归档', onclick: function () { toggleArchive(it.id); } }));
   foot.appendChild(U.el('button', { class: 'btn ghost sm', text: '导出文案', onclick: function () { exportOne(it); } }));
   card.appendChild(foot);
   return card;
+}
+
+/* ===================== 共享：二创弹窗（猫咪账号专属脚本） ===================== */
+function openCreationModal(it) {
+  var p = parseVideo({ link: it.url || '', title: it.title || '', desc: it.note || '' });
+  var body = U.el('div');
+  renderAnalysis(body, p, { link: it.url || '', title: it.title || '', desc: it.note || '' });
+  // 额外操作：加入选题（保存为素材）/ 收藏 / 复制口播稿
+  var actRow = U.el('div', { class: 'row', style: 'margin-top:12px' });
+  actRow.appendChild(U.el('button', { class: 'btn sm', text: '⭐ 收藏', onclick: function () { toggleStar(it.id); U.toast('已收藏，可在「素材库-我的」查看'); } }));
+  actRow.appendChild(U.el('button', { class: 'btn ghost sm', text: '📋 复制口播稿', onclick: function () { copyText(p.script); U.toast('已复制口播稿'); } }));
+  body.appendChild(actRow);
+  U.modal({ title: '🎬 二创 · 猫咪账号专属脚本', body: body, actions: [{ label: '关闭', primary: true }] });
 }
 
 /* ===================== 共享：二级类目导航 ===================== */
@@ -579,66 +593,89 @@ function exportSelected(state) {
 function exportOne(it) { downloadText('爆款拆解_' + (it.title || '素材') + '.txt', itemText(it)); }
 
 /* ===================== Page 1：爆款视频 ===================== */
+var vvSubTab = 'rank'; // 'rank' | 'daily'，跨重绘保持当前 Tab
 App.pages['viral-videos'] = function (root) {
   U.clear(root);
   var state = { platform: 'all', catGroup: 'all', track: 'all', starred: 'all', dateFrom: '', dateTo: '', view: 'all', selected: {}, batchMode: false };
 
-  // 实时热榜（真实联网）
-  var liveCard = U.el('div', { class: 'card' });
-  liveCard.appendChild(U.el('div', { class: 'card-title', html: '实时热榜选题 <span class="src-tag" id="vvLiveSrc"></span>' }));
-  liveCard.appendChild(U.el('div', { class: 'muted', text: '真实联网抓取抖音/微博热榜，选题灵感直接来自当下热点（非平台原视频，仅供方向参考）。' }));
-  var liveTabs = U.el('div', { class: 'filter-bar', id: 'vvLiveTabs' });
-  [['douyin', '抖音热榜'], ['weibo', '微博热搜']].forEach(function (t) {
-    liveTabs.appendChild(U.el('span', { class: 'tag' + (liveType === t[0] ? ' active' : ''), text: t[1], onclick: function () { liveType = t[0]; U.$all('#vvLiveTabs .tag').forEach(function (x) { x.classList.toggle('active', x.textContent === t[1]); }); loadLive(liveBox, liveSrc); } }));
-  });
-  liveCard.appendChild(liveTabs);
-  liveCard.appendChild(U.el('button', { class: 'btn sm', style: 'margin:10px 0', text: '🔄 刷新实时热榜', onclick: function () { loadLive(liveBox, liveSrc); } }));
-  var liveBox = U.el('div', { id: 'vvLiveBox' });
-  var liveSrc = U.el('span');
-  liveCard.appendChild(liveBox);
-  root.appendChild(liveCard);
-
-  // 顶部操作条
-  var opCard = U.el('div', { class: 'card' });
-  opCard.appendChild(U.el('div', { class: 'card-title', html: '爆款视频榜 <span class="demo-badge">参考模板</span>' }));
-  var opRow = U.el('div', { class: 'row wrap' });
-  opRow.appendChild(U.el('button', { class: 'btn sm', text: '一键刷新榜单', onclick: function () { collect(true); } }));
-  opRow.appendChild(U.el('button', { class: 'btn ghost sm', text: '我的收藏', id: 'vvFav', onclick: function () { state.view = state.view === 'favorites' ? 'all' : 'favorites'; App.renderCurrent(); } }));
-  opCard.appendChild(opRow);
-  root.appendChild(opCard);
-
-  // 筛选栏
-  var fCard = U.el('div', { class: 'card' });
-  var fBar = U.el('div', { class: 'filter-bar' });
-  var platSel = U.el('select', { class: 'input', onchange: function () { state.platform = this.value; App.renderCurrent(); } },
-    [U.el('option', { value: 'all', text: '全部平台' }), U.el('option', { value: 'douyin', text: '抖音' }), U.el('option', { value: 'xhs', text: '小红书' })]);
-  var fromD = U.el('input', { class: 'input', type: 'date', onchange: function () { state.dateFrom = this.value; App.renderCurrent(); } });
-  var toD = U.el('input', { class: 'input', type: 'date', onchange: function () { state.dateTo = this.value; App.renderCurrent(); } });
-  fBar.appendChild(platSel); fBar.appendChild(fromD); fBar.appendChild(toD);
-  fCard.appendChild(U.el('div', { class: 'card-title', text: '筛选检索' }));
-  fCard.appendChild(fBar);
-  var catGroupBar = U.el('div', { class: 'filter-bar', id: 'vvCatGroups', style: 'margin-top:10px' });
-  fCard.appendChild(catGroupBar);
-  var trackChips = U.el('div', { class: 'filter-bar', id: 'vvTracks', style: 'margin-top:8px' });
-  fCard.appendChild(trackChips);
-  root.appendChild(fCard);
-
-  var listBox = U.el('div', { id: 'vvList' });
-  root.appendChild(listBox);
-
-  function render() {
-    U.$('#vvFav').classList.toggle('active', state.view === 'favorites');
-    U.$('#vvFav').textContent = state.view === 'favorites' ? '全部素材' : '我的收藏';
-    renderTracks(state, catGroupBar, trackChips);
-    var arr = filtered(state);
-    U.clear(listBox);
-    if (!arr.length) { listBox.appendChild(U.el('div', { class: 'empty', text: '暂无素材，点击「一键刷新榜单」或去「素材库」手动新增' })); return; }
-    arr.forEach(function (it) { listBox.appendChild(videoCard(it, state)); });
+  // 顶部子导航：爆款视频榜 / 今日参谋
+  var tabBar = U.el('div', { class: 'filter-bar', id: 'vvTabBar', style: 'position:sticky;top:0;background:var(--bg);z-index:6;padding:6px 0' });
+  var tabRank = U.el('button', { class: 'tag' + (vvSubTab === 'rank' ? ' active' : ''), text: '🎬 爆款视频榜', onclick: function () { vvSubTab = 'rank'; syncTabs(); renderView(); } });
+  var tabDaily = U.el('button', { class: 'tag' + (vvSubTab === 'daily' ? ' active' : ''), text: '📌 今日参谋', onclick: function () { vvSubTab = 'daily'; syncTabs(); renderView(); } });
+  tabBar.appendChild(tabRank); tabBar.appendChild(tabDaily);
+  root.appendChild(tabBar);
+  function syncTabs() {
+    tabRank.classList.toggle('active', vvSubTab === 'rank');
+    tabDaily.classList.toggle('active', vvSubTab === 'daily');
   }
 
-  ensureCollected();
-  render();
-  loadLive(liveBox, liveSrc);
+  var viewRoot = U.el('div');
+  root.appendChild(viewRoot);
+
+  function renderView() {
+    U.clear(viewRoot);
+    if (vvSubTab === 'daily') App.renderDailyContent(viewRoot);
+    else renderRank();
+  }
+
+  function renderRank() {
+    // 实时热榜（真实联网）
+    var liveCard = U.el('div', { class: 'card' });
+    liveCard.appendChild(U.el('div', { class: 'card-title', html: '实时热榜选题 <span class="src-tag" id="vvLiveSrc"></span>' }));
+    liveCard.appendChild(U.el('div', { class: 'muted', text: '真实联网抓取抖音/微博热榜，选题灵感直接来自当下热点（非平台原视频，仅供方向参考）。' }));
+    var liveTabs = U.el('div', { class: 'filter-bar', id: 'vvLiveTabs' });
+    [['douyin', '抖音热榜'], ['weibo', '微博热搜']].forEach(function (t) {
+      liveTabs.appendChild(U.el('span', { class: 'tag' + (liveType === t[0] ? ' active' : ''), text: t[1], onclick: function () { liveType = t[0]; U.$all('#vvLiveTabs .tag').forEach(function (x) { x.classList.toggle('active', x.textContent === t[1]); }); loadLive(liveBox, liveSrc); } }));
+    });
+    liveCard.appendChild(liveTabs);
+    liveCard.appendChild(U.el('button', { class: 'btn sm', style: 'margin:10px 0', text: '🔄 刷新实时热榜', onclick: function () { loadLive(liveBox, liveSrc); } }));
+    var liveBox = U.el('div', { id: 'vvLiveBox' });
+    var liveSrc = U.el('span');
+    liveCard.appendChild(liveBox);
+    viewRoot.appendChild(liveCard);
+
+    // 顶部操作条
+    var opCard = U.el('div', { class: 'card' });
+    opCard.appendChild(U.el('div', { class: 'card-title', html: '爆款视频榜 <span class="demo-badge">参考模板</span>' }));
+    var opRow = U.el('div', { class: 'row wrap' });
+    opRow.appendChild(U.el('button', { class: 'btn sm', text: '一键刷新榜单', onclick: function () { collect(true); } }));
+    opRow.appendChild(U.el('button', { class: 'btn ghost sm', text: '我的收藏', id: 'vvFav', onclick: function () { state.view = state.view === 'favorites' ? 'all' : 'favorites'; App.renderCurrent(); } }));
+    opCard.appendChild(opRow);
+    viewRoot.appendChild(opCard);
+
+    // 筛选 / 分类（平台 + 二级类目）
+    var fCard = U.el('div', { class: 'card' });
+    fCard.appendChild(U.el('div', { class: 'card-title', text: '筛选 / 分类' }));
+    var fBar = U.el('div', { class: 'filter-bar' });
+    var platSel = U.el('select', { class: 'input', onchange: function () { state.platform = this.value; App.renderCurrent(); } },
+      [U.el('option', { value: 'all', text: '全部平台' }), U.el('option', { value: 'douyin', text: '抖音' }), U.el('option', { value: 'xhs', text: '小红书' })]);
+    fBar.appendChild(platSel);
+    fCard.appendChild(fBar);
+    var catGroupBar = U.el('div', { class: 'filter-bar', id: 'vvCatGroups', style: 'margin-top:10px' });
+    fCard.appendChild(catGroupBar);
+    var trackChips = U.el('div', { class: 'filter-bar', id: 'vvTracks', style: 'margin-top:8px' });
+    fCard.appendChild(trackChips);
+    viewRoot.appendChild(fCard);
+
+    var listBox = U.el('div', { id: 'vvList' });
+    viewRoot.appendChild(listBox);
+
+    function render() {
+      U.$('#vvFav').classList.toggle('active', state.view === 'favorites');
+      U.$('#vvFav').textContent = state.view === 'favorites' ? '全部素材' : '我的收藏';
+      renderTracks(state, catGroupBar, trackChips);
+      var arr = filtered(state);
+      U.clear(listBox);
+      if (!arr.length) { listBox.appendChild(U.el('div', { class: 'empty', text: '暂无素材，点击「一键刷新榜单」或去「素材库」手动新增' })); return; }
+      arr.forEach(function (it) { listBox.appendChild(videoCard(it, state)); });
+    }
+
+    ensureCollected();
+    render();
+    loadLive(liveBox, liveSrc);
+  }
+
+  renderView();
 };
 
 /* ===================== Page 2：视频智能解析（独立一级类目） ===================== */
@@ -722,109 +759,9 @@ App.pages['vv-analyzer'] = function (root) {
   }
 };
 
-/* ===================== Page 3：素材库（独立一级类目） ===================== */
-App.pages['vv-library'] = function (root) {
-  U.clear(root);
-  var state = { platform: 'all', catGroup: 'all', track: 'all', starred: 'all', dateFrom: '', dateTo: '', view: 'all', selected: {}, batchMode: false };
-
-  // 顶部操作条
-  var opCard = U.el('div', { class: 'card' });
-  opCard.appendChild(U.el('div', { class: 'card-title', html: '爆款素材库 <span class="demo-badge">参考模板</span>' }));
-  var opRow = U.el('div', { class: 'row wrap' });
-  opRow.appendChild(U.el('button', { class: 'btn sm', text: '一键刷新榜单', onclick: function () { collect(true); } }));
-  opRow.appendChild(U.el('button', { class: 'btn ghost sm', text: '手动新增素材', onclick: openManual }));
-  var favBtn = U.el('button', { class: 'btn ghost sm', text: '我的收藏', id: 'vvFav', onclick: function () { state.view = state.view === 'favorites' ? 'all' : 'favorites'; App.renderCurrent(); } });
-  opRow.appendChild(favBtn);
-  var batchBtn = U.el('button', { class: 'btn ghost sm', text: '批量模式', id: 'vvBatch', onclick: function () { toggleBatch(state); } });
-  opRow.appendChild(batchBtn);
-  var arcBtn = U.el('button', { class: 'btn ghost sm', text: '批量归档', id: 'vvArc', style: 'display:none', onclick: function () { batchArchive(state); } });
-  opRow.appendChild(arcBtn);
-  var delBtn = U.el('button', { class: 'btn danger sm', text: '批量删除', id: 'vvDel', style: 'display:none', onclick: function () { batchDelete(state); } });
-  opRow.appendChild(delBtn);
-  var expBtn = U.el('button', { class: 'btn ghost sm', text: '导出选中', id: 'vvExp', style: 'display:none', onclick: function () { exportSelected(state); } });
-  opRow.appendChild(expBtn);
-  opCard.appendChild(opRow);
-  root.appendChild(opCard);
-
-  // 筛选栏
-  var fCard = U.el('div', { class: 'card' });
-  var fBar = U.el('div', { class: 'filter-bar' });
-  var platSel = U.el('select', { class: 'input', onchange: function () { state.platform = this.value; App.renderCurrent(); } },
-    [U.el('option', { value: 'all', text: '全部平台' }), U.el('option', { value: 'douyin', text: '抖音' }), U.el('option', { value: 'xhs', text: '小红书' })]);
-  var fromD = U.el('input', { class: 'input', type: 'date', onchange: function () { state.dateFrom = this.value; App.renderCurrent(); } });
-  var toD = U.el('input', { class: 'input', type: 'date', onchange: function () { state.dateTo = this.value; App.renderCurrent(); } });
-  fBar.appendChild(platSel); fBar.appendChild(fromD); fBar.appendChild(toD);
-  fCard.appendChild(U.el('div', { class: 'card-title', text: '筛选检索' }));
-  fCard.appendChild(fBar);
-  var catGroupBar = U.el('div', { class: 'filter-bar', id: 'vvCatGroups', style: 'margin-top:10px' });
-  fCard.appendChild(catGroupBar);
-  var trackChips = U.el('div', { class: 'filter-bar', id: 'vvTracks', style: 'margin-top:8px' });
-  fCard.appendChild(trackChips);
-  root.appendChild(fCard);
-
-  var listBox = U.el('div', { id: 'vvList' });
-  root.appendChild(listBox);
-
-  function renderGuide(state, box) {
-    U.clear(box);
-    var tracks;
-    if (state.track !== 'all') tracks = [state.track];
-    else if (state.catGroup !== 'all') { var g = CATS.filter(function (c) { return c.id === state.catGroup; })[0]; tracks = g ? g.tracks : []; }
-    else tracks = null;
-    if (!tracks) {
-      box.appendChild(U.el('div', { class: 'card', style: 'margin-top:14px' }, [
-        U.el('div', { class: 'card-title', text: '📸 分类拍摄指南' }),
-        U.el('div', { class: 'muted', text: '点击上方「宠物大类」或「二级类目」标签，这里会给出该类的景别 / 运镜 / 文案 / BGM / 标签 拍摄要点。' })
-      ]));
-      return;
-    }
-    var items = POOL.filter(function (p) { return tracks.indexOf(p.track) > -1; });
-    if (!items.length) { U.clear(box); return; }
-    function uniq(arr) { var s = {}, out = []; arr.forEach(function (x) { if (x && !s[x]) { s[x] = 1; out.push(x); } }); return out; }
-    var visual = uniq(items.map(function (p) { return p.reason.visual; }));
-    var shoot = uniq(items.map(function (p) { return p.inspire.shoot; }));
-    var copy = uniq(items.map(function (p) { return p.reason.copy; }));
-    var bgm = uniq(items.map(function (p) { return p.reason.bgm; }));
-    var tag = uniq(items.map(function (p) { return p.reason.tag; }));
-    var topic = uniq(items.map(function (p) { return p.inspire.topic; }));
-    var title = state.track !== 'all' ? state.track : (CATS.filter(function (c) { return c.id === state.catGroup; })[0].name);
-    var card = U.el('div', { class: 'card', style: 'margin-top:14px' });
-    card.appendChild(U.el('div', { class: 'card-title', text: '📸 ' + title + ' · 分类拍摄指南' }));
-    var rows = [
-      ['🎥 景别 / 运镜', visual.concat(shoot)],
-      ['✍ 文案话术', copy],
-      ['🎵 热门 BGM', bgm],
-      ['🏷 流量标签', tag],
-      ['💡 选题方向', topic]
-    ];
-    rows.forEach(function (rw) {
-      if (!rw[1].length) return;
-      card.appendChild(U.el('div', { class: 'card-sub', style: 'margin:8px 0 4px', text: rw[0] }));
-      card.appendChild(U.el('div', { style: 'font-size:13px;line-height:1.6', text: rw[1].join(' / ') }));
-    });
-    box.appendChild(card);
-  }
-
-  function render() {
-    favBtn.textContent = state.view === 'favorites' ? '全部素材' : '我的收藏';
-    favBtn.classList.toggle('active', state.view === 'favorites');
-    batchBtn.textContent = state.batchMode ? '退出批量' : '批量模式';
-    arcBtn.style.display = state.batchMode ? '' : 'none';
-    delBtn.style.display = state.batchMode ? '' : 'none';
-    expBtn.style.display = state.batchMode ? '' : 'none';
-    renderTracks(state, catGroupBar, trackChips);
-    var arr = filtered(state);
-    var guideBox = U.$('#vvGuide');
-    if (!guideBox) { guideBox = U.el('div', { id: 'vvGuide' }); root.insertBefore(guideBox, listBox); }
-    renderGuide(state, guideBox);
-    U.clear(listBox);
-    if (!arr.length) { listBox.appendChild(U.el('div', { class: 'empty', text: '暂无素材，点击「一键刷新榜单」或「手动新增」' })); return; }
-    arr.forEach(function (it) { listBox.appendChild(videoCard(it, state)); });
-  }
-
-  ensureCollected();
-  render();
-};
+// 注意：素材库已重构为「5 Tab」（爆款雷达 / 素材 / 选题 / 数据 / 我的），
+// 见 assets/js/pages/vv-library.js。下面这些共享函数（collect / filtered /
+// videoCard / renderTracks / openManual / export* 等）仍保留在本文件供其复用。
 
 // 暴露给全局提醒调度（每日 5:00 自动采集）
 App._videoAutoCollect = collect;

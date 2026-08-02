@@ -1,8 +1,10 @@
 /* ============================================================
-   每日内容参谋（今日行动建议 / 爆款雷达 / 一键拍摄脚本）
+   每日内容参谋（今日行动建议 / 爆款雷达 / 一键拍摄脚本 / BGM / 剪辑音效）
    - 数据来自 assets/data/daily-data.js（window.__DAILY__）
    - 该文件由每日自动化任务（GitHub API 写文件 + push）覆盖更新，
      实现「不开电脑、手机随时刷站点即最新」。
+   - 渲染逻辑抽成 App.renderDailyContent(root)，供「今日参谋」独立页
+     与「爆款视频」顶部「今日参谋」Tab 复用。
    ============================================================ */
 window.App = window.App || {};
 App.pages = App.pages || {};
@@ -23,7 +25,23 @@ App.pages = App.pages || {};
 
   function getDaily() { return window.__DAILY__ || null; }
 
-  App.pages['daily-advice'] = function (root) {
+  // 单条 BGM / 音效 卡片（写清：适合什么内容 + 叠在哪一层）
+  function mediaCard(title, item) {
+    var c = U.el('div', { class: 'card', style: 'margin-bottom:10px;background:var(--surface)' });
+    c.appendChild(U.el('div', { class: 'card-sub', style: 'margin:0 0 4px', text: title + '：' + item.name }));
+    c.appendChild(U.el('div', { style: 'font-size:13px;margin:2px 0' }, [
+      U.el('span', { style: 'color:var(--brand);font-weight:600', text: '适合内容：' }),
+      U.el('span', { text: item.for })
+    ]));
+    c.appendChild(U.el('div', { style: 'font-size:13px;margin:2px 0' }, [
+      U.el('span', { style: 'color:var(--brand);font-weight:600', text: '叠加方式：' }),
+      U.el('span', { text: item.layer })
+    ]));
+    return c;
+  }
+
+  /* ---------- 核心渲染（可复用） ---------- */
+  App.renderDailyContent = function (root) {
     U.clear(root);
     var d = getDaily();
     if (!d) {
@@ -99,10 +117,33 @@ App.pages = App.pages || {};
       root.appendChild(sc);
     }
 
+    // BGM 推荐
+    if (d.bgm && d.bgm.length) {
+      var bgmCard = U.el('div', { class: 'card' });
+      bgmCard.appendChild(U.el('div', { class: 'card-title', text: '🎵 BGM 推荐（写明适合内容 + 叠加方式）' }));
+      bgmCard.appendChild(U.el('div', { class: 'muted', style: 'margin-bottom:8px', text: '按今日脚本情绪挑 1–2 首铺底，注意音量不要盖过猫咪原声。' }));
+      d.bgm.forEach(function (b) { bgmCard.appendChild(mediaCard('🎧', b)); });
+      root.appendChild(bgmCard);
+    }
+
+    // 剪辑音效
+    if (d.sound && d.sound.length) {
+      var sCard = U.el('div', { class: 'card' });
+      sCard.appendChild(U.el('div', { class: 'card-title', text: '🔊 剪辑音效（写清用在什么画面 + 叠在哪一层）' }));
+      sCard.appendChild(U.el('div', { class: 'muted', style: 'margin-bottom:8px', text: '音效是点睛，别贪多；同一段落最多叠 1–2 个，时长控制在 0.2s 内。' }));
+      d.sound.forEach(function (s) { sCard.appendChild(mediaCard('🔔', s)); });
+      root.appendChild(sCard);
+    }
+
     // 更新时间
     root.appendChild(U.el('div', {
       class: 'muted daily-updated',
       text: '数据更新于 ' + (d.updatedAt || d.date || '未知') + ' · 由每日自动化任务刷新（无需开电脑）'
     }));
+  };
+
+  /* ---------- 独立页（导航「今日参谋」） ---------- */
+  App.pages['daily-advice'] = function (root) {
+    App.renderDailyContent(root);
   };
 })();

@@ -357,6 +357,12 @@ body {
 .tag.xs { padding: 2px 8px; font-size: 11px; border-radius: 999px; cursor: default; }
 .import-preview { border: 1px dashed var(--line); border-radius: var(--radius-sm); padding: 12px; background: var(--surface-2); }
 
+/* 菜谱：卡路里 / 营养概览 */
+.dish-cal { font-size: 12px; color: var(--text-2); margin: 2px 0 6px; }
+.dish-cal b { color: var(--brand); }
+.nutri-ok { color: #1a9e54; background: rgba(26,158,84,.10); border: 1px solid rgba(26,158,84,.28); border-radius: 10px; padding: 9px 11px; }
+.nutri-warn { color: #c9631a; background: rgba(212,105,26,.10); border: 1px solid rgba(212,105,26,.28); border-radius: 10px; padding: 9px 11px; }
+
 
 
 /* 筛选栏 */

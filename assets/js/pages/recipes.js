@@ -35,6 +35,63 @@ App.pages = App.pages || {};
   var catMap = {};
   CATS.forEach(function (g) { g.items.forEach(function (it) { catMap[it.id] = it.name; }); });
 
+  /* ---------- 食材热量库（每 100g kcal，估算参考值，源自公开营养资料） ---------- */
+  var FOOD_CAL = {
+    '鸡肉':133,'鸡胸':133,'鸡腿':120,'鸡翅':200,'鸡蛋':144,'蛋黄':352,'蛋白':52,'鸭蛋':180,
+    '猪肉':143,'五花肉':349,'里脊':155,'排骨':264,'猪蹄':260,'腊肉':181,'香肠':508,'培根':505,
+    '牛肉':250,'牛腩':332,'牛排':250,'羊肉':203,'羊排':294,
+    '鱼':100,'鲫鱼':108,'鲈鱼':105,'带鱼':127,'草鱼':112,'三文鱼':139,'鳕鱼':88,'虾':93,'虾仁':93,'蟹':95,'鱿鱼':92,'扇贝':60,'海参':78,'鲍鱼':84,'蛤':62,'花蛤':62,'蛏':59,'猪肝':129,'牛蛙':85,
+    '豆腐':81,'嫩豆腐':81,'老豆腐':98,'豆干':140,'香干':140,'腐竹':459,'千张':260,'豆芽':47,'黄豆芽':47,'绿豆芽':47,'毛豆':131,'蚕豆':335,'豌豆':105,
+    '皮蛋':171,'咸蛋':190,'鹌鹑蛋':160,
+    '生菜':15,'油麦菜':15,'上海青':15,'菜心':20,'白菜':18,'小白菜':15,'菠菜':23,'空心菜':20,'茼蒿':21,'芥兰':25,'芹菜':14,'香菜':27,'韭菜':26,'油菜':20,'娃娃菜':14,'包菜':22,'卷心菜':22,'西兰花':34,'花菜':25,'菜花':25,'番茄':18,'西红柿':18,'黄瓜':15,'冬瓜':10,'南瓜':26,'丝瓜':20,'苦瓜':19,'茄子':25,'青椒':20,'彩椒':26,'辣椒':40,'小米辣':40,'洋葱':40,'胡萝卜':39,'白萝卜':16,'萝卜':16,'土豆':77,'红薯':86,'紫薯':86,'山药':57,'莲藕':74,'莴笋':15,'芦笋':20,'秋葵':37,'竹笋':27,'冬笋':27,'香菇':26,'平菇':24,'金针菇':32,'杏鲍菇':31,'木耳':27,'银耳':36,'海带':13,'紫菜':35,'西葫芦':17,'荷兰豆':30,'四季豆':31,'豇豆':31,'玉米':86,'青豆':86,'毛豆':131,
+    '米饭':116,'大米':346,'面条':138,'面粉':344,'馒头':221,'面包':265,'吐司':265,'粉丝':338,'粉条':338,'年糕':154,'糯米':350,'饺子皮':280,
+    '食用油':884,'橄榄油':884,'玉米油':884,'花生油':884,'葵花籽油':884,'香油':884,'芝麻油':884,'黄油':717,'猪油':897,
+    '盐':0,'生抽':63,'老抽':71,'酱油':63,'蚝油':110,'醋':31,'米醋':31,'香醋':31,'白醋':31,'糖':400,'白糖':400,'冰糖':397,'蜂蜜':304,'料酒':114,'黄酒':100,'白酒':298,'豆瓣酱':200,'甜面酱':220,'番茄酱':82,'沙拉酱':380,'花生酱':594,'芝麻酱':618,'咖喱':210,'淀粉':350,'生粉':350,
+    '牛奶':54,'纯牛奶':54,'酸奶':72,'芝士':328,'奶酪':328,'淡奶油':346,'炼乳':331,'巧克力':546,'可可粉':320,'咖啡':2,'花生':567,'核桃':654,'杏仁':579,'腰果':553,'瓜子':608,'坚果':600
+  };
+  // 计数单位默认单重（克/个）——用于「1个/根/瓣」等无质量单位
+  var PER_UNIT = {
+    '鸡蛋':50,'番茄':150,'西红柿':150,'土豆':150,'黄瓜':200,'洋葱':150,'青椒':100,'茄子':200,
+    '冬瓜':500,'南瓜':400,'胡萝卜':150,'白萝卜':400,'红薯':200,'山药':150,'莲藕':150,'西葫芦':200,
+    '玉米':150,'蒜':5,'大蒜':5,'姜':20,'葱':30,'香菜':10,'柠檬':50,'橙':150,
+    '香菇':15,'平菇':20,'木耳':5,'红枣':8,'枸杞':2,'虾仁':15,'虾':20,'鱼':300,'豆腐':300,'香干':50,
+    '西兰花':150,'白菜':300,'包菜':300,'生菜':200,'油麦菜':200,'娃娃菜':200,'皮蛋':60,'咸蛋':60,'鹌鹑蛋':10
+  };
+  var UNIT_G = { '克':1,'g':1,'G':1,'千克':1000,'kg':1000,'公斤':1000,'斤':500,'两':50,'ml':1,'毫升':1,'升':1000,'l':1000 };
+  var VAGUE = { '少许':3,'少量':5,'适量':10,'若干':5,'一点':3,'一点点':2,'几滴':2,'半勺':2.5,'1勺':5,'一勺':5,'1大勺':15,'一大勺':15,'小勺':3,'半碗':100 };
+
+  function calPer100(name) {
+    var best = null, bestLen = 0;
+    for (var k in FOOD_CAL) { if (name.indexOf(k) > -1 && k.length > bestLen) { best = FOOD_CAL[k]; bestLen = k.length; } }
+    return best; // 每百克 kcal，无则返回 undefined
+  }
+  function parseGrams(ing) {
+    var s = ing || '';
+    for (var vk in VAGUE) { if (s.indexOf(vk) > -1) return { g: VAGUE[vk], vague: true }; }
+    var m = s.match(/(\d+(?:\.\d+)?)\s*(克|g|G|千克|kg|公斤|斤|两|ml|毫升|升|l)/);
+    if (m) { var num = parseFloat(m[1]); return { g: num * (UNIT_G[m[2]] || 1), vague: false }; }
+    var cm = s.match(/(\d+(?:\.\d+)?)\s*(个|颗|根|瓣|只|条|块|片|把|段|粒|张|枚|朵|穗)/);
+    if (cm) {
+      var n2 = parseFloat(cm[1]); var per = 0;
+      for (var pk in PER_UNIT) { if (s.indexOf(pk) > -1) { per = PER_UNIT[pk]; break; } }
+      return { g: per ? n2 * per : 0, vague: per ? false : true };
+    }
+    if (/盐/.test(s)) return { g: 2, vague: true };
+    if (/水|清水/.test(s)) return { g: 0, vague: true };
+    return { g: 0, vague: true };
+  }
+  function dishCalories(d) {
+    var total = 0, details = [], unmatched = [];
+    (d.ingredients || []).forEach(function (ing) {
+      var cal = calPer100(ing); var gm = parseGrams(ing);
+      if (cal != null && gm.g > 0) {
+        var kcal = Math.round(cal * gm.g / 100); total += kcal;
+        details.push({ ing: ing, g: Math.round(gm.g), kcal: kcal, vague: gm.vague });
+      } else { unmatched.push(ing); }
+    });
+    return { total: total, details: details, unmatched: unmatched };
+  }
+
   /* 菜谱数据来自 菜单/*.docx 提取（scripts/gen_recipes.py 生成 recipes-extra.js），真实菜名/食材/做法 */
   var RECIPES = (window.__EXTRA_RECIPES__ || []).map(function (d) {
     return {
@@ -85,6 +142,7 @@ App.pages = App.pages || {};
   /* ---------- 页面渲染 ---------- */
   App.pages['recipes'] = function (root) {
     U.clear(root);
+    var searchTerm = '';
 
     /* 顶部快速入口 */
     var quick = U.el('div', { class: 'filter-bar', style: 'position:sticky;top:0;background:var(--bg);z-index:5;padding:6px 0' });
@@ -101,6 +159,11 @@ App.pages = App.pages || {};
     /* ===== 菜谱分类 ===== */
     var catsCard = U.el('div', { class: 'card', id: 'sec-cats' });
     catsCard.appendChild(U.el('div', { class: 'card-title', text: '🍽 菜谱分类' }));
+    var searchRow = U.el('div', { class: 'row', style: 'margin-bottom:10px;gap:8px' });
+    var searchI = U.el('input', { class: 'input', placeholder: '搜索菜名 / 食材 / 做法', style: 'flex:1;min-width:0', oninput: function () { searchTerm = this.value.trim(); renderGrid(sel.value, grid); } });
+    searchRow.appendChild(searchI);
+    searchRow.appendChild(U.el('button', { class: 'btn sm', style: 'background:#f5871f;color:#fff;border:none', text: '🔍 搜索', onclick: function () { searchTerm = searchI.value.trim(); renderGrid(sel.value, grid); } }));
+    catsCard.appendChild(searchRow);
     var sel = U.el('select', { class: 'input', style: 'max-width:240px;margin-bottom:14px', onchange: function () { renderGrid(sel.value, grid); } });
     sel.appendChild(U.el('option', { value: 'all', text: '全部菜品（' + RECIPES.length + '）' }));
     CATS.forEach(function (g) {
@@ -282,20 +345,33 @@ App.pages = App.pages || {};
       var imported = getImported();
       var total = RECIPES.length + imported.length;
       var list = RECIPES.concat(imported);
+      // 搜索优先（菜名 / 食材 / 做法）
+      if (searchTerm) {
+        var kw = searchTerm.toLowerCase();
+        list = list.filter(function (d) {
+          var hay = (d.name || '') + ' ' + (d.ingredients || []).join(' ') + ' ' + (d.steps || []).join(' ') + ' ' + (d.text || '');
+          return hay.toLowerCase().indexOf(kw) > -1;
+        });
+      }
       if (catId && catId !== 'all') list = list.filter(function (d) { return (d.cats || []).indexOf(catId) > -1; });
-      else list = list.slice(0, 10); // 默认只展示前 10 道，其余靠分类筛选
-      if (!list.length) { gridEl.appendChild(U.el('div', { class: 'empty', text: '该分类暂无菜品' })); return; }
+      else if (!searchTerm) list = list.slice(0, 10); // 默认只展示前 10 道，其余靠分类筛选
+      if (searchTerm && list.length > 30) list = list.slice(0, 30);
+      if (!list.length) { gridEl.appendChild(U.el('div', { class: 'empty', text: searchTerm ? '没有匹配的菜品，换个关键词试试' : '该分类暂无菜品' })); return; }
       list.forEach(function (d) {
         var card = U.el('div', { class: 'dish-card', onclick: function () { showDish(d); } });
         var info = U.el('div', { class: 'dish-info' });
         info.appendChild(U.el('div', { class: 'dish-name', text: d.name }));
+        var cal = dishCalories(d);
+        if (cal.total > 0) info.appendChild(U.el('div', { class: 'dish-cal', text: '约 ' + cal.total + ' kcal' }));
         var tags = U.el('div', { class: 'dish-tags' });
         dishTags(d).slice(0, 3).forEach(function (t) { tags.appendChild(U.el('span', { class: 'tag xs', text: t })); });
         info.appendChild(tags);
         card.appendChild(info);
         gridEl.appendChild(card);
       });
-      if ((!catId || catId === 'all') && total > 10) {
+      if (searchTerm) {
+        gridEl.appendChild(U.el('div', { class: 'muted', style: 'grid-column:1/-1;margin-top:6px;font-size:12px', text: '匹配到 ' + (list.length > 30 ? '30+' : list.length) + ' 道菜（估算热量基于食材）' }));
+      } else if ((!catId || catId === 'all') && total > 10) {
         gridEl.appendChild(U.el('div', { class: 'muted', style: 'grid-column:1/-1;margin-top:6px;font-size:12px', text: '仅展示前 10 道，选择上方分类可查看该分类全部 ' + total + ' 道菜品。' }));
       }
     }
@@ -313,8 +389,18 @@ App.pages = App.pages || {};
       var methodBox = U.el('div');
       body.appendChild(methodBox);
       if (d.ingredients && d.ingredients.length) {
-        methodBox.appendChild(U.el('div', { class: 'card-sub', style: 'margin:6px 0 4px', text: '🥬 食材' }));
-        methodBox.appendChild(U.el('div', { text: d.ingredients.join('、') }));
+        var cal = dishCalories(d);
+        methodBox.appendChild(U.el('div', { class: 'card-sub', style: 'margin:6px 0 4px', text: '🥬 食材 / 热量（估算）' }));
+        d.ingredients.forEach(function (ing) {
+          var det = null;
+          for (var i = 0; i < cal.details.length; i++) { if (cal.details[i].ing === ing) { det = cal.details[i]; break; } }
+          var row = U.el('div', { style: 'display:flex;justify-content:space-between;gap:10px;margin:2px 0;font-size:13px' });
+          row.appendChild(U.el('span', { text: ing }));
+          row.appendChild(U.el('span', { class: 'muted', text: det ? (det.g + 'g · ' + det.kcal + ' kcal') : '—' }));
+          methodBox.appendChild(row);
+        });
+        methodBox.appendChild(U.el('div', { style: 'font-weight:700;margin-top:6px', text: '整道菜约 ' + cal.total + ' kcal（整份·估算）' }));
+        if (cal.unmatched.length) methodBox.appendChild(U.el('div', { class: 'muted', style: 'font-size:12px;margin-top:2px', text: '（“' + cal.unmatched.join('、') + '”无热量数据，未计入）' }));
       }
       if (d.steps && d.steps.length) {
         methodBox.appendChild(U.el('div', { class: 'card-sub', style: 'margin:10px 0 4px', text: '👩‍🍳 做法' }));
@@ -335,10 +421,18 @@ App.pages = App.pages || {};
       });
     }
 
+    function statCard(label, val, unit) {
+      var c = U.el('div', { style: 'background:var(--surface);border-radius:10px;padding:10px;text-align:center' });
+      c.appendChild(U.el('div', { class: 'muted', style: 'font-size:12px', text: label }));
+      c.appendChild(U.el('div', { style: 'font-size:20px;font-weight:800', text: val }));
+      c.appendChild(U.el('div', { class: 'muted', style: 'font-size:11px', text: unit }));
+      return c;
+    }
     function generateGuide() {
       var arr = getPreselect();
       if (!arr.length) { U.toast('请先预选至少一道菜'); return; }
       var dishes = arr.map(findDish).filter(Boolean);
+      var personCount = 2;
       var groups = [['meat', '🍖 肉菜'], ['veg', '🥬 青菜'], ['soup', '🍲 汤'], ['other', '📎 其他']];
       var body = U.el('div');
       var actions = U.el('div', { class: 'row', style: 'margin-bottom:10px' });
@@ -346,15 +440,27 @@ App.pages = App.pages || {};
       actions.appendChild(U.el('button', { class: 'btn ghost sm', text: '⬇ 下载TXT', onclick: function () { U.download('做菜指南_' + S.todayStr() + '.txt', buildGuideText(dishes), 'text/plain;charset=utf-8'); } }));
       actions.appendChild(U.el('button', { class: 'btn ghost sm', text: '⭐ 存到灵感', onclick: function () { saveToInspiration(dishes); } }));
       body.appendChild(actions);
+
+      // 就餐人数选择器（默认 2 人，中餐家常菜普遍 2 人份）
+      var personRow = U.el('div', { class: 'row', style: 'margin-bottom:10px;align-items:center' });
+      personRow.appendChild(U.el('span', { class: 'muted', style: 'margin-right:4px', text: '就餐人数：' }));
+      [1,2,3,4].forEach(function (n) {
+        personRow.appendChild(U.el('span', { class: 'tag' + (n === 2 ? ' active' : ''), id: 'pc-' + n, text: n + '人', onclick: function () {
+          personCount = n; [1,2,3,4].forEach(function (m) { var e = U.$('#pc-' + m); if (e) e.classList.toggle('active', m === n); }); renderNutri();
+        } }));
+      });
+      body.appendChild(personRow);
+
       groups.forEach(function (g) {
         var list = dishes.filter(function (d) { return g[0] === 'other' ? (d.type !== 'meat' && d.type !== 'veg' && d.type !== 'soup') : d.type === g[0]; });
         if (!list.length) return;
         body.appendChild(U.el('div', { style: 'font-weight:800;font-size:15px;margin:14px 0 6px;border-top:1px solid var(--line);padding-top:10px', text: g[1] + '（' + list.length + '）' }));
         list.forEach(function (d, i) {
+          var cal = dishCalories(d);
           var ing = d.ingredients || [];
           var st = d.steps || [];
           var txt = d.text || '';
-          body.appendChild(U.el('div', { style: 'font-weight:700;font-size:14px;margin:8px 0 4px', text: (i + 1) + '. ' + d.name }));
+          body.appendChild(U.el('div', { style: 'font-weight:700;font-size:14px;margin:8px 0 4px', text: (i + 1) + '. ' + d.name + (cal.total ? '（约' + cal.total + 'kcal）' : '') }));
           var pics = (d.images && d.images.length) ? d.images.slice(0, 8) : (d.image ? [d.image] : []);
           pics.forEach(function (u) {
             body.appendChild(U.el('img', { src: u, style: 'width:100%;border-radius:10px;margin-bottom:8px;background:var(--surface-3)', onerror: function () { this.style.display = 'none'; } }));
@@ -368,6 +474,34 @@ App.pages = App.pages || {};
           if (d.sourceUrl) body.appendChild(U.el('a', { class: 'muted', style: 'font-size:12px;display:block;margin-top:4px', href: d.sourceUrl, target: '_blank', rel: 'noopener', text: '🔗 原链接' }));
         });
       });
+
+      // 营养概览（本餐总量 / 人均 / 一餐建议 / 超标运动建议）
+      var nutriBox = U.el('div', { style: 'margin-top:14px;border-top:1px solid var(--line);padding-top:10px' });
+      body.appendChild(nutriBox);
+      function renderNutri() {
+        U.clear(nutriBox);
+        var totalC = dishes.reduce(function (s, d) { return s + dishCalories(d).total; }, 0);
+        var per = Math.round(totalC / personCount);
+        var recommend = 700; // 成人一餐建议人均（女600-男850间取中值）
+        var card = U.el('div', { class: 'card', style: 'background:var(--surface-2)' });
+        card.appendChild(U.el('div', { class: 'card-title', text: '📊 营养概览（估算）' }));
+        var gridN = U.el('div', { class: 'grid c3', style: 'gap:8px' });
+        gridN.appendChild(statCard('本餐总量', totalC, 'kcal'));
+        gridN.appendChild(statCard('人均热量', per, 'kcal/人'));
+        gridN.appendChild(statCard('一餐建议', recommend, 'kcal/人'));
+        card.appendChild(gridN);
+        if (per <= recommend) {
+          card.appendChild(U.el('div', { class: 'nutri-ok', style: 'margin-top:8px;font-size:13px', text: '✓ 人均 ' + per + ' kcal，在建议范围内（成人一餐约 600–850 kcal），正常享用。' }));
+        } else {
+          var over = per - recommend;
+          var walk = Math.max(1, Math.ceil(over / 5));
+          var jog = Math.max(1, Math.ceil(over / 10));
+          var rope = Math.max(1, Math.ceil(over / 13));
+          card.appendChild(U.el('div', { class: 'nutri-warn', style: 'margin-top:8px;font-size:13px;line-height:1.6', text: '⚠ 人均 ' + per + ' kcal，超出建议 ' + over + ' kcal。建议消耗：快走约 ' + walk + ' 分钟 / 慢跑约 ' + jog + ' 分钟 / 跳绳约 ' + rope + ' 分钟（按 60kg 成人中等强度估算）。' }));
+        }
+        nutriBox.appendChild(card);
+      }
+      renderNutri();
       U.modal({ title: '今日做菜指南', body: body, actions: [{ label: '关闭', primary: true, onClick: function () {} }] });
     }
 
