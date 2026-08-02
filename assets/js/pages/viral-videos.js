@@ -69,27 +69,67 @@ function genSample(count) {
   return items;
 }
 
+/* ===================== 共享：从标题推断赛道 ===================== */
+function inferTrack(title) {
+  var t = (title || '').toLowerCase();
+  var pet = '综合', form = '日常';
+  if (/猫|喵|布偶|橘|英短|加菲|狸花|蓝猫|缅因|奶牛猫/.test(t)) pet = '猫咪';
+  else if (/狗|汪|金毛|柯基|柴犬|边牧|萨摩|泰迪|比熊|遛狗/.test(t)) pet = '狗狗';
+  else if (/仓鼠|异宠|爬宠|龟|兔|鸟|水族|鱼|蜥蜴/.test(t)) pet = '异宠';
+  if (/剧情|反转|报恩|故事|情感|泪目|感动|救助/.test(t)) form = '剧情';
+  else if (/科普|为什么|为何|原理|知识|误区|涨知识|怎么|如何/.test(t)) form = '科普';
+  else if (/穿搭|衣服|秋冬|春夏|搭配|穿衣/.test(t)) form = '穿搭';
+  else if (/测评|红黑榜|好物|种草|平价|推荐|必买|红榜|黑榜|避坑|实测/.test(t)) form = '好物';
+  return pet + form;
+}
+
 /* ===================== 共享：采集 ===================== */
 function collect(manual) {
   var v = S.getVideos();
   if (manual) {
     if (v.dailyCollected.date !== S.todayStr()) v.dailyCollected = { date: S.todayStr(), items: [] };
-    var fresh = genSample(8);
-    v.dailyCollected.items = fresh.concat(v.dailyCollected.items).slice(0, 40);
   } else {
-    v.dailyCollected = { date: S.todayStr(), items: genSample(12) };
+    v.dailyCollected = { date: S.todayStr(), items: [] };
   }
-  S.saveVideos(v);
-  if (manual) U.toast('已刷新（参考模板）');
-  App.renderCurrent();
+  var type = liveType || 'douyin';
+  var base = (window.APP_CONFIG && window.APP_CONFIG.TRENDING_API) || '';
+  var url = base + (base.indexOf('?') > -1 ? '&' : '?') + 'type=' + type + '&_t=' + Date.now();
+  return U.fetchJSON(url, 12000).then(function (j) {
+    var items = (j && j.items) ? j.items : U.normalizeHot(j);
+    if (!items || !items.length) throw new Error('empty');
+    var fresh = items.slice(0, manual ? 8 : 12).map(function (x, i) {
+      var p = POOL[i % POOL.length];
+      var track = inferTrack(x.title) || p.track;
+      return {
+        id: U.uid(), platform: type === 'xhs' ? 'xhs' : 'douyin', track: track, title: x.title,
+        url: x.url || (type === 'douyin' ? 'https://www.douyin.com/' : 'https://www.xiaohongshu.com/'),
+        hot: x.hot || 0, date: S.todayStr(), reason: p.reason, inspire: p.inspire,
+        starred: false, archived: false, tags: [track], source: 'live', note: '', img: ''
+      };
+    });
+    if (manual) v.dailyCollected.items = fresh.concat(v.dailyCollected.items).slice(0, 40);
+    else v.dailyCollected.items = fresh;
+    S.saveVideos(v);
+    if (manual) U.toast('已刷新（实时热榜）');
+    App.renderCurrent();
+  }).catch(function () {
+    var fresh = genSample(manual ? 8 : 12);
+    if (manual) v.dailyCollected.items = fresh.concat(v.dailyCollected.items).slice(0, 40);
+    else v.dailyCollected.items = fresh;
+    S.saveVideos(v);
+    if (manual) U.toast('已刷新（参考模板）');
+    App.renderCurrent();
+  });
 }
 function ensureCollected() {
   var v = S.getVideos();
-  if (!v.dailyCollected.items.length && !v.manual.length) collect(false);
+  if (!v.dailyCollected.items.length && !v.manual.length) {
+    // 首次无数据时先给同步示例，避免白屏；同时在后台尝试拉取真实热榜
+    v.dailyCollected = { date: S.todayStr(), items: genSample(12) };
+    S.saveVideos(v);
+    collect(false);
+  }
 }
-
-// 接入真实 API 的占位（返回同样结构的数组即可）：
-// async function collectFromAPI(){ const r = await fetch('你的接口'); return r.json(); }
 
 /* ===================== 共享：数据合并与筛选 ===================== */
 function allItems() {

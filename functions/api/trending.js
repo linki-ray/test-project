@@ -7,23 +7,23 @@
  */
 const SOURCES = {
   douyin: [
-    'https://api.vvhan.com/api/hotlist/douyin',
-    'https://api-hot.imsyy.top/douyin',
-    'https://api.pearktrue.cn/api/douyinhot/',
+    'https://60s.viki.moe/v2/douyin',
     'https://uapis.cn/api/v1/misc/hotboard?type=douyin',
-    'https://60s.viki.moe/v2/douyin'
+    'https://api-hot.imsyy.top/douyin',
+    'https://api.vvhan.com/api/hotlist/douyin',
+    'https://api.pearktrue.cn/api/douyinhot/'
   ],
   weibo: [
-    'https://uapis.cn/api/v1/misc/hotboard?type=weibo',
-    'https://60s.viki.moe/v2/weibo'
+    'https://60s.viki.moe/v2/weibo',
+    'https://uapis.cn/api/v1/misc/hotboard?type=weibo'
   ],
   zhihu: [
-    'https://uapis.cn/api/v1/misc/hotboard?type=zhihu',
-    'https://60s.viki.moe/v2/zhihu'
+    'https://60s.viki.moe/v2/zhihu',
+    'https://uapis.cn/api/v1/misc/hotboard?type=zhihu'
   ],
   baidu: [
-    'https://uapis.cn/api/v1/misc/hotboard?type=baidu',
-    'https://60s.viki.moe/v2/baidu'
+    'https://60s.viki.moe/v2/baidu',
+    'https://uapis.cn/api/v1/misc/hotboard?type=baidu'
   ]
 };
 

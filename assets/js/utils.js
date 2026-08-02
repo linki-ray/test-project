@@ -152,17 +152,17 @@ App.U = (function () {
     if (list && list.result && Array.isArray(list.result)) list = list.result;
     if (!Array.isArray(list)) return [];
     return list.map(function (x) {
-      if (x && typeof x === 'object' && (x.title || x.word || x.name || x.query)) {
-        return { title: x.title || x.word || x.name || x.query || '', hot: x.hot || x.num || x.score || x.heat || 0, url: x.url || x.mblink || x.link || x.mobileUrl || '' };
+      if (x && typeof x === 'object' && (x.title || x.word || x.name || x.query || x.text)) {
+        return { title: x.title || x.word || x.name || x.query || x.text || '', hot: x.hot_value || x.hot || x.num || x.score || x.heat || 0, url: x.url || x.mblink || x.link || x.h5_url || x.mobileUrl || '' };
       }
       return null;
     }).filter(function (x) { return x && x.title; });
   }
   var DIRECT = {
-    douyin: ['https://api.pearktrue.cn/api/douyinhot/', 'https://api.oioweb.cn/api/common/HotList?type=douyin'],
-    weibo: ['https://api.oioweb.cn/api/common/HotList?type=weibo', 'https://tenapi.cn/v2/weibohot', 'https://api.vvhan.com/api/hotlist/wbHot'],
-    zhihu: ['https://api.oioweb.cn/api/common/HotList?type=zhihu'],
-    baidu: ['https://api.oioweb.cn/api/common/HotList?type=baidu']
+    douyin: ['https://60s.viki.moe/v2/douyin', 'https://tmini.net/api/Collection?type=000'],
+    weibo: ['https://60s.viki.moe/v2/weibo'],
+    zhihu: ['https://60s.viki.moe/v2/zhihu'],
+    baidu: ['https://60s.viki.moe/v2/baidu']
   };
   function fetchTrending(type, ms) {
     type = type || 'douyin';
