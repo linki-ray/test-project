@@ -463,10 +463,10 @@ function saveParsedAsMaterial(p, input) {
     hot: 0, date: S.todayStr(), source: 'parsed',
     reason: { hook: p.hook, emotion: p.emotion, twist: p.twist, visual: p.visual, copy: p.copy, bgm: p.bgm, tag: p.tag },
     inspire: { script: p.script, shoot: p.visual, copyTpl: p.titles[1] || '', topic: p.track },
-    starred: false, archived: false, tags: [p.track], note: p.actionable, img: '', fileName: ''
+    starred: true, archived: false, tags: [p.track], note: p.actionable, img: '', fileName: ''
   });
   S.saveVideos(v);
-  U.toast('已保存为素材，可在「素材库」查看/收藏');
+  U.toast('已保存并收藏，可在「素材库-我的」查看');
 }
 
 /* ===================== 共享：发给豆包深度解析（不接 API，复制提示词去豆包 App） ===================== */
@@ -594,9 +594,11 @@ function exportOne(it) { downloadText('爆款拆解_' + (it.title || '素材') +
 
 /* ===================== Page 1：爆款视频 ===================== */
 var vvSubTab = 'rank'; // 'rank' | 'daily'，跨重绘保持当前 Tab
+var RANK_STATE = null; // 爆款视频榜筛选/视图状态持久化（避免 App.renderCurrent 后重置）
 App.pages['viral-videos'] = function (root) {
   U.clear(root);
-  var state = { platform: 'all', catGroup: 'all', track: 'all', starred: 'all', dateFrom: '', dateTo: '', view: 'all', selected: {}, batchMode: false };
+  if (!RANK_STATE) RANK_STATE = { platform: 'all', catGroup: 'all', track: 'all', starred: 'all', dateFrom: '', dateTo: '', view: 'all', selected: {}, batchMode: false };
+  var state = RANK_STATE;
 
   // 顶部子导航：爆款视频榜 / 今日参谋
   var tabBar = U.el('div', { class: 'filter-bar', id: 'vvTabBar', style: 'position:sticky;top:0;background:var(--bg);z-index:6;padding:6px 0' });

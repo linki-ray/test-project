@@ -10,7 +10,8 @@
    ============================================================ */
 window.App = window.App || {};
 App.pages = App.pages || {};
-var VV_LIB_TAB = 'radar'; // 跨重绘保持当前 Tab：radar / materials / topics / data / mine
+  var VV_LIB_TAB = 'radar'; // 跨重绘保持当前 Tab：radar / materials / topics / data / mine
+  var MAT_STATE = null;     // 素材 Tab 筛选/视图/批量状态持久化（避免 App.renderCurrent 后重置）
 (function () {
   var U = App.U;
 
@@ -96,7 +97,8 @@ var VV_LIB_TAB = 'radar'; // 跨重绘保持当前 Tab：radar / materials / top
 
   /* ---------- Tab 2：素材 ---------- */
   function renderMaterials(root) {
-    var state = { platform: 'all', catGroup: 'all', track: 'all', starred: 'all', dateFrom: '', dateTo: '', view: 'all', selected: {}, batchMode: false };
+    if (!MAT_STATE) MAT_STATE = { platform: 'all', catGroup: 'all', track: 'all', starred: 'all', dateFrom: '', dateTo: '', view: 'all', selected: {}, batchMode: false };
+    var state = MAT_STATE;
 
     var opCard = U.el('div', { class: 'card' });
     opCard.appendChild(U.el('div', { class: 'card-title', html: '爆款素材库 <span class="demo-badge">参考模板</span>' }));
