@@ -283,6 +283,22 @@ body {
 .grid.c2 { grid-template-columns: repeat(2, 1fr); }
 .grid.c3 { grid-template-columns: repeat(3, 1fr); }
 .grid.c4 { grid-template-columns: repeat(4, 1fr); }
+
+/* 今日参谋（每日内容参谋） */
+.daily-greeting { font-size: 14px; color: var(--text-2); line-height: 1.6; margin: 4px 2px 14px; padding: 12px 14px; background: var(--surface-2); border-radius: 14px; border-left: 3px solid var(--red, #ef4444); }
+.daily-advice { border: 1px solid var(--line); }
+.advice-title { font-size: 18px; font-weight: 800; color: var(--text); margin: 2px 0 10px; }
+.advice-reasons { margin: 0 0 10px; padding-left: 20px; }
+.advice-reasons li { font-size: 14px; line-height: 1.7; color: var(--text-2); }
+.advice-meta { font-size: 13px; color: var(--text-3); margin-top: 6px; }
+.hot-item { padding: 12px 0; border-top: 1px solid var(--line); }
+.hot-item:first-of-type { border-top: none; }
+.hot-tag { font-size: 15px; font-weight: 700; color: var(--red, #ef4444); margin-bottom: 4px; }
+.hot-note { font-size: 14px; color: var(--text-2); line-height: 1.6; }
+.hot-angle { font-size: 13px; margin-top: 4px; }
+.script-line { font-size: 14px; color: var(--text-2); line-height: 1.7; margin: 4px 0; }
+.script-tags { font-size: 13px; color: var(--accent, #4a63e8); margin: 8px 0 4px; word-break: break-all; }
+.daily-updated { margin-top: 14px; text-align: right; }
 @media (max-width: 640px) { .grid.c4 { grid-template-columns: repeat(2, 1fr); } .grid.c3 { grid-template-columns: 1fr; } .grid.c2 { grid-template-columns: 1fr; } }
 
 /* 金融行情 */
