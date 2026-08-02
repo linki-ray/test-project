@@ -9,7 +9,7 @@
   var TITLES = {
     'daily-plan': '每日计划', 'viral-videos': '爆款抖音小红书视频',
     'inspiration': '灵感记录', 'finance': '全球金融热点', 'checkin': '打卡计划',
-    'vv-analyzer': '视频智能解析', 'vv-library': '爆款素材库', 'reading': '阅读读书',
+    'vv-analyzer': '视频智能解析', 'vv-library': '爆款素材库', 'vv-creation': '爆款二创', 'reading': '阅读读书',
     'recipes': '今日菜谱', 'daily-advice': '今日参谋'
   };
 
