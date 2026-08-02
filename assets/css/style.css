@@ -130,6 +130,26 @@ body {
 }
 .nav-settings:hover { background: var(--surface-2); color: var(--text-2); }
 
+/* 一级类目排序 */
+.nav-sort-btn {
+  width: 100%; margin: 6px 0 2px; padding: 9px 10px; border: none; border-radius: 12px;
+  background: var(--surface-2); color: var(--text-2); font-size: 13px; cursor: pointer; transition: .18s;
+}
+.nav-sort-btn:hover { background: var(--surface-3); }
+.nav-sort-btn.active { background: var(--brand); color: #fff; font-weight: 700; }
+.nav-menu.sorting .nav-item,
+.nav-menu.sorting .nav-group > .nav-group-toggle,
+.nav-menu.sorting .nav-group { outline: 1px dashed rgba(120,130,160,.45); outline-offset: 2px; }
+.nav-menu.sorting .nav-item,
+.nav-menu.sorting .nav-group { display: flex; align-items: center; cursor: default; }
+.nav-handle { display: inline-flex; flex-direction: column; gap: 2px; margin-right: 6px; }
+.nav-move {
+  font-size: 10px; line-height: 1; padding: 3px 6px; border: none; border-radius: 5px;
+  background: rgba(120,130,160,.25); color: var(--text); cursor: pointer;
+}
+.nav-move:hover { background: var(--brand); color: #fff; }
+
+
 /* =========================================================
    主内容区
    ========================================================= */

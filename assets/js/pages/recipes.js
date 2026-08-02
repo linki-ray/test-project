@@ -153,6 +153,7 @@ App.pages = App.pages || {};
     }
     quick.appendChild(mkQuick('🍽 菜谱分类', 'sec-cats'));
     quick.appendChild(mkQuick('🎯 今日吃什么', 'sec-wheel'));
+    quick.appendChild(mkQuick('🔥 卡路里计算器', 'sec-cal'));
     quick.appendChild(mkQuick('📥 导入菜单', 'sec-import'));
     root.appendChild(quick);
 
@@ -316,6 +317,7 @@ App.pages = App.pages || {};
     var genBtn = U.el('button', { class: 'btn ghost sm', style: 'margin-top:10px', text: '📋 一键生成做菜指南', onclick: function () { generateGuide(); } });
     wheelCard.appendChild(genBtn);
     root.appendChild(wheelSection);
+    renderCalorieCalc();
     renderGlobalPre();
 
     /* ===== 导入菜单 ===== */
@@ -546,6 +548,233 @@ App.pages = App.pages || {};
         if (S.saveInspirations) S.saveInspirations(arr);
         U.toast('已存入灵感记录，可在「灵感记录」查看');
       } catch (e) { U.toast('保存失败：' + (e.message || e)); }
+    }
+
+    /* ---------- 卡路里计算器（双人：狐狸 / RAY，个性化反推） ---------- */
+    function renderCalorieCalc() {
+      var PERSONS = ['狐狸', 'RAY'];
+      var ACT = {
+        sedentary: { f: 1.2, t: '久坐（很少运动）' },
+        light: { f: 1.375, t: '轻度（每周 1-3 次）' },
+        moderate: { f: 1.55, t: '中度（每周 3-5 次）' },
+        high: { f: 1.725, t: '高强度（每周 6-7 次）' }
+      };
+      var GOALS = { fatloss: '减脂', loss: '减重', gain: '增重', muscle: '增肌', maintain: '维持' };
+      var MEAL = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐' };
+
+      function profKey(n) { return 'cal_profile_' + n; }
+      function logKey(n) { return 'cal_log_' + n; }
+      function getProfile(n) { return S.get(profKey(n), null); }
+      function setProfile(n, p) { S.set(profKey(n), p); }
+      function getLog(n) { return S.get(logKey(n), {}); }
+      function setLog(n, l) { S.set(logKey(n), l); }
+
+      // 首次进入：按用户给定数据预置狐狸 / RAY 档案
+      if (!getProfile('狐狸')) setProfile('狐狸', { name: '狐狸', gender: '女', height: 161, weight: 80, age: 30, activity: 'light', goal: 'fatloss' });
+      if (!getProfile('RAY')) setProfile('RAY', { name: 'RAY', gender: '女', height: 150, weight: 54.5, age: 30, activity: 'light', goal: 'fatloss' });
+
+      function computeBMI(w, hcm) { var m = hcm / 100; var bmi = w / (m * m); var cat; if (bmi < 18.5) cat = '偏瘦'; else if (bmi < 24) cat = '正常'; else if (bmi < 28) cat = '超重'; else cat = '肥胖'; return { bmi: bmi, cat: cat }; }
+      function computeBMR(p) { var base = 10 * p.weight + 6.25 * p.height - 5 * p.age; return Math.round(base + (p.gender === '男' ? 5 : 161)); }
+      function computeTDEE(bmr, act) { return Math.round(bmr * (ACT[act] ? ACT[act].f : 1.375)); }
+      function targetIntake(tdee, goal) {
+        if (goal === 'fatloss') return Math.round(tdee - 400);
+        if (goal === 'loss') return Math.round(tdee - 650);
+        if (goal === 'gain') return Math.round(tdee + 400);
+        if (goal === 'muscle') return Math.round(tdee + 300);
+        return tdee;
+      }
+      function estimateFromName(name) {
+        var keys = Object.keys(FOOD_CAL).sort(function (a, b) { return b.length - a.length; });
+        var total = 0, found = [], covered = name;
+        keys.forEach(function (k) {
+          if (covered.indexOf(k) > -1) { total += FOOD_CAL[k]; found.push(k); covered = covered.replace(k, ' '); }
+        });
+        return { kcal: total, found: found };
+      }
+      function findRecipeByName(name) {
+        var all = RECIPES.concat(getImported());
+        var exact = null, partial = null;
+        for (var i = 0; i < all.length; i++) {
+          if (all[i].name === name) exact = all[i];
+          else if (!partial && all[i].name && (all[i].name.indexOf(name) > -1 || name.indexOf(all[i].name) > -1)) partial = all[i];
+        }
+        return exact || partial;
+      }
+
+      function buildExercisePlan(p, dayTotal) {
+        var bmiInfo = computeBMI(p.weight, p.height);
+        var bmr = computeBMR(p); var tdee = computeTDEE(bmr, p.activity);
+        var target = targetIntake(tdee, p.goal);
+        var remain = target - dayTotal;
+        var actions = [], taboo = [];
+        var heavy = p.weight >= 75;
+        var met = { walk: 3.5, hoop: 3.0, squat: 5.0, pushup: 4.0, bridge: 3.5, plank: 3.0, dance: 5.0, stretch: 2.0, rope: 9.0 };
+        function add(name, min, m, note) { actions.push({ name: name, min: min, burn: Math.round(m * min * p.weight / 60), note: note || '' }); }
+        if (bmiInfo.cat === '肥胖' || heavy) {
+          add('原地踏步 / 快走', 35, met.walk, '膝盖友好，可边看剧边走');
+          add('呼啦圈', 10, met.hoop, '腰腹塑形，从短时长起步，腰腹酸胀即停');
+          add('靠墙静蹲 / 坐姿抬腿', 10, met.squat * 0.6, '强化腿力不伤膝');
+          add('臀桥 + 拉伸放松', 10, met.bridge, '放松腰背');
+          taboo.push('跑步 / 跳绳 / 波比跳 / 深蹲跳等高冲击动作（体重较大，护膝优先）');
+        } else if (bmiInfo.cat === '偏瘦') {
+          add('徒手深蹲 + 俯卧撑', 15, met.squat, '增肌为主');
+          add('臀桥 + 平板支撑', 10, met.bridge, '核心臀腿');
+          add('拉伸放松', 10, met.stretch, '避免受伤');
+          taboo.push('长时间空腹有氧（偏瘦增重期应少做）');
+        } else {
+          add('快走', 25, met.walk, '日常有氧');
+          add('徒手深蹲 + 靠墙俯卧撑', 15, met.squat, '全身力量');
+          add('平板支撑', 5, met.plank, '核心');
+          add('呼啦圈', 10, met.hoop, '腰腹');
+          add('开合跳 / 跟练舞蹈操（选做）', 10, met.dance, '提升心率');
+          if (!heavy) taboo.push('体重较轻可加少量跳绳，循序渐进即可');
+        }
+        if (p.goal === 'muscle' || p.goal === 'gain') {
+          actions = actions.filter(function (a) { return /深蹲|俯卧撑|臀桥|平板|拉伸/.test(a.name); });
+          if (!actions.length) add('徒手深蹲 + 俯卧撑', 15, met.squat, '增肌为主');
+        }
+        return { bmiInfo: bmiInfo, bmr: bmr, tdee: tdee, target: target, remain: remain, actions: actions, taboo: taboo };
+      }
+
+      var curPerson = '狐狸';
+      var sec = U.el('div', { class: 'card', id: 'sec-cal' });
+      root.appendChild(sec);
+
+      function addDishModal(person) {
+        var body = U.el('div');
+        var nameI = U.el('input', { class: 'input', placeholder: '输入菜名（可搜菜谱库自动估算）' });
+        var mealSel = U.el('select', { class: 'input', style: 'margin-top:8px' }, [
+          U.el('option', { value: 'breakfast', text: '早餐' }), U.el('option', { value: 'lunch', text: '午餐' }), U.el('option', { value: 'dinner', text: '晚餐' })
+        ]);
+        var estBox = U.el('div', { class: 'muted', style: 'margin-top:8px;font-size:13px' });
+        var kcalI = U.el('input', { class: 'input', type: 'number', placeholder: '卡路里 kcal（可改）', style: 'margin-top:8px' });
+        body.appendChild(nameI); body.appendChild(mealSel); body.appendChild(estBox); body.appendChild(kcalI);
+        function recalc() {
+          var nm = nameI.value.trim(); if (!nm) { estBox.textContent = ''; kcalI.value = ''; return; }
+          var r = findRecipeByName(nm);
+          if (r) { var c = dishCalories(r).total; estBox.textContent = '匹配菜谱「' + r.name + '」估算约 ' + c + ' kcal'; kcalI.value = c; }
+          else { var e = estimateFromName(nm); if (e.kcal > 0) { estBox.textContent = '按食材关键词估算约 ' + e.kcal + ' kcal（' + e.found.join('、') + '）'; kcalI.value = e.kcal; } else { estBox.textContent = '未识别到热量，请手动填写'; kcalI.value = ''; } }
+        }
+        nameI.addEventListener('input', recalc);
+        function confirm() {
+          var nm = nameI.value.trim(); if (!nm) { U.toast('请输入菜名'); return; }
+          var kcal = parseFloat(kcalI.value); if (isNaN(kcal) || kcal < 0) { U.toast('请输入有效卡路里'); return; }
+          var log = getLog(person); var d = S.todayStr();
+          if (!log[d]) log[d] = { breakfast: [], lunch: [], dinner: [] };
+          log[d][mealSel.value].push({ name: nm, kcal: Math.round(kcal) });
+          setLog(person, log);
+          U.toast('已记录到 ' + person + ' 的' + MEAL[mealSel.value]);
+          paint();
+        }
+        U.modal({ title: '添加菜品 · ' + person, body: body, actions: [{ label: '添加', primary: true, onClick: confirm }, { label: '取消', onClick: function () {} }] });
+        nameI.focus();
+      }
+
+      function editProfileModal(person) {
+        var p = getProfile(person) || { name: person, gender: '女', height: 160, weight: 60, age: 30, activity: 'light', goal: 'fatloss' };
+        var body = U.el('div');
+        function field(label, node) { var d = U.el('div', { class: 'field', style: 'margin-bottom:8px' }); d.appendChild(U.el('label', { class: 'muted', style: 'font-size:12px;display:block', text: label })); d.appendChild(node); return d; }
+        var gender = U.el('select', { class: 'input' }, [U.el('option', { value: '女', text: '女' }), U.el('option', { value: '男', text: '男' })]); gender.value = p.gender;
+        var height = U.el('input', { class: 'input', type: 'number', value: p.height });
+        var weight = U.el('input', { class: 'input', type: 'number', step: '0.1', value: p.weight });
+        var age = U.el('input', { class: 'input', type: 'number', value: p.age });
+        var act = U.el('select', { class: 'input' }); Object.keys(ACT).forEach(function (k) { act.appendChild(U.el('option', { value: k, text: ACT[k].t })); }); act.value = p.activity;
+        var goal = U.el('select', { class: 'input' }); Object.keys(GOALS).forEach(function (k) { goal.appendChild(U.el('option', { value: k, text: GOALS[k] })); }); goal.value = p.goal;
+        body.appendChild(field('性别', gender));
+        body.appendChild(field('身高 (cm)', height));
+        body.appendChild(field('体重 (kg)', weight));
+        body.appendChild(field('年龄', age));
+        body.appendChild(field('日常活动量', act));
+        body.appendChild(field('目标', goal));
+        U.modal({
+          title: '编辑档案 · ' + person, body: body, actions: [
+            { label: '保存', primary: true, onClick: function () {
+              var np = { name: person, gender: gender.value, height: parseFloat(height.value) || 0, weight: parseFloat(weight.value) || 0, age: parseFloat(age.value) || 0, activity: act.value, goal: goal.value };
+              setProfile(person, np); U.toast('已保存 ' + person + ' 档案'); paint();
+            } },
+            { label: '取消', onClick: function () {} }
+          ]
+        });
+      }
+
+      function showPlan(person) {
+        var p = getProfile(person); if (!p) { U.toast('请先编辑档案'); return; }
+        var log = getLog(person); var d = S.todayStr(); var day = log[d] || { breakfast: [], lunch: [], dinner: [] };
+        var total = 0; ['breakfast', 'lunch', 'dinner'].forEach(function (k) { total += (day[k] || []).reduce(function (s, x) { return s + x.kcal; }, 0); });
+        var plan = buildExercisePlan(p, total);
+        var body = U.el('div');
+        body.appendChild(U.el('div', { class: 'muted', style: 'font-size:12px', text: person + ' · ' + GOALS[p.goal] + ' · BMI ' + plan.bmiInfo.bmi.toFixed(1) + '（' + plan.bmiInfo.cat + '）' }));
+        body.appendChild(U.el('div', { class: 'card-sub', style: 'margin:6px 0 4px', text: '📊 今日收支' }));
+        body.appendChild(U.el('div', { style: 'font-size:13px', text: '摄入 ' + total + ' / 目标 ' + plan.target + ' kcal · ' + (plan.remain >= 0 ? ('尚可摄入 ' + plan.remain) : ('已超 ' + Math.abs(plan.remain))) }));
+        body.appendChild(U.el('div', { class: 'card-sub', style: 'margin:10px 0 4px', text: '🏠 居家运动计划（无器材' + (p.weight >= 75 ? '，护膝低冲击' : '') + ' · 含呼啦圈）' }));
+        plan.actions.forEach(function (a) {
+          var row = U.el('div', { style: 'margin:6px 0;padding:8px;background:var(--surface);border-radius:8px' });
+          row.appendChild(U.el('div', { style: 'font-weight:700', text: a.name + ' · ' + a.min + ' 分钟' }));
+          row.appendChild(U.el('div', { class: 'muted', style: 'font-size:12px', text: '约消耗 ' + a.burn + ' kcal · ' + a.note }));
+          body.appendChild(row);
+        });
+        if (plan.taboo.length) body.appendChild(U.el('div', { class: 'nutri-warn', style: 'margin-top:8px;font-size:12px;line-height:1.6', text: '⚠ 注意：' + plan.taboo.join('；') }));
+        var burn = plan.actions.reduce(function (s, a) { return s + a.burn; }, 0);
+        body.appendChild(U.el('div', { class: 'muted', style: 'margin-top:8px;font-size:12px', text: '预计总消耗约 ' + burn + ' kcal（按 ' + person + ' 体重 ' + p.weight + 'kg 估算）' }));
+        if (p.goal === 'muscle' || p.goal === 'gain') body.appendChild(U.el('div', { class: 'muted', style: 'margin-top:6px;font-size:12px', text: '💡 增肌/增重期：保证蛋白质（蛋奶瘦肉豆制品）+ 热量盈余，运动以力量为主。' }));
+        U.modal({ title: '今日运动计划 · ' + person, body: body, actions: [{ label: '关闭', primary: true, onClick: function () {} }] });
+      }
+
+      function paint() {
+        U.clear(sec);
+        sec.appendChild(U.el('div', { class: 'card-title', text: '🔥 卡路里计算器（狐狸 / RAY）' }));
+        sec.appendChild(U.el('div', { class: 'muted', style: 'margin-bottom:8px;font-size:12px', text: '两人独立档案，按身高/体重/年龄/活动量/目标个性化反推；记录存本机，关浏览器也在。' }));
+        var tabs = U.el('div', { class: 'row', style: 'margin-bottom:10px' });
+        PERSONS.forEach(function (n) {
+          tabs.appendChild(U.el('span', { class: 'tag' + (n === curPerson ? ' active' : ''), text: n, onclick: function () { curPerson = n; paint(); } }));
+        });
+        sec.appendChild(tabs);
+
+        var p = getProfile(curPerson);
+        if (p) {
+          var bmiInfo = computeBMI(p.weight, p.height);
+          var bmr = computeBMR(p); var tdee = computeTDEE(bmr, p.activity); var target = targetIntake(tdee, p.goal);
+          var stats = U.el('div', { class: 'grid c4', style: 'gap:8px;margin-bottom:8px' });
+          stats.appendChild(statCard('BMI', bmiInfo.bmi.toFixed(1), bmiInfo.cat));
+          stats.appendChild(statCard('基础代谢', bmr, 'kcal/天'));
+          stats.appendChild(statCard('每日消耗', tdee, 'kcal/天'));
+          stats.appendChild(statCard('目标摄入', target, 'kcal/天'));
+          sec.appendChild(stats);
+        }
+
+        var tb = U.el('div', { class: 'row wrap', style: 'margin-bottom:10px;gap:6px' });
+        tb.appendChild(U.el('button', { class: 'btn sm', text: '＋ 添加菜品', onclick: function () { addDishModal(curPerson); } }));
+        tb.appendChild(U.el('button', { class: 'btn ghost sm', text: '✎ 编辑档案', onclick: function () { editProfileModal(curPerson); } }));
+        tb.appendChild(U.el('button', { class: 'btn ghost sm', text: '🏃 今日运动计划', onclick: function () { showPlan(curPerson); } }));
+        sec.appendChild(tb);
+
+        var log = getLog(curPerson); var d = S.todayStr(); var day = log[d] || { breakfast: [], lunch: [], dinner: [] };
+        var total = 0;
+        ['breakfast', 'lunch', 'dinner'].forEach(function (mk) {
+          var arr = day[mk] || []; var mt = arr.reduce(function (s, x) { return s + x.kcal; }, 0); total += mt;
+          var box = U.el('div', { style: 'margin:8px 0' });
+          box.appendChild(U.el('div', { class: 'card-sub', text: MEAL[mk] + '（' + mt + ' kcal）' }));
+          if (!arr.length) box.appendChild(U.el('div', { class: 'muted', style: 'font-size:12px', text: '（未记录）' }));
+          arr.forEach(function (x, i) {
+            var row = U.el('div', { class: 'row', style: 'justify-content:space-between;font-size:13px;margin:2px 0' });
+            row.appendChild(U.el('span', { text: x.name + ' · ' + x.kcal + ' kcal' }));
+            row.appendChild(U.el('span', { class: 'tag removable', text: '✕', onclick: function () { day[mk].splice(i, 1); setLog(curPerson, log); paint(); } }));
+            box.appendChild(row);
+          });
+          sec.appendChild(box);
+        });
+
+        if (p) {
+          var target2 = targetIntake(computeTDEE(computeBMR(p), p.activity), p.goal);
+          var remain = target2 - total;
+          var sum = U.el('div', { class: 'card', style: 'background:var(--surface-2);margin-top:8px' });
+          sum.appendChild(U.el('div', { class: 'card-sub', text: '今日摄入合计 ' + total + ' / 目标 ' + target2 + ' kcal' }));
+          if (remain >= 0) sum.appendChild(U.el('div', { class: 'nutri-ok', style: 'margin-top:6px;font-size:13px', text: '✓ 还可摄入约 ' + remain + ' kcal' + (remain === 0 ? '（已达目标）' : '') }));
+          else sum.appendChild(U.el('div', { class: 'nutri-warn', style: 'margin-top:6px;font-size:13px', text: '⚠ 已超出目标 ' + Math.abs(remain) + ' kcal，点「今日运动计划」看消耗方案' }));
+          sec.appendChild(sum);
+        }
+      }
+      paint();
     }
 
     /* ---------- 导入逻辑 ---------- */

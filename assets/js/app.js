@@ -213,6 +213,7 @@
 
   /* ---------- 事件绑定 ---------- */
   U.$('#navMenu').addEventListener('click', function (e) {
+    if (U.$('#navMenu').classList.contains('sorting')) return; // 排序模式下不触发导航
     var btn = e.target.closest('.nav-item, .nav-sub-item'); if (!btn) return;
     navigate(btn.getAttribute('data-page'));
   });
@@ -257,6 +258,67 @@
 
   // 供同步轮询重绘当前页
   App.renderCurrent = function () { navigate(current); };
+
+  /* ---------- 一级类目自由排序（持久化到 localStorage） ---------- */
+  var NAV_ORDER_KEY = 'nav_order_v1';
+  function navIdent(el) {
+    if (el.classList.contains('nav-group')) return 'group:' + (el.getAttribute('data-group') || '');
+    return 'page:' + (el.getAttribute('data-page') || '');
+  }
+  function saveNavOrder() {
+    var menu = U.$('#navMenu'); if (!menu) return;
+    var ids = [];
+    Array.prototype.forEach.call(menu.children, function (c) {
+      if (c.classList.contains('nav-item') || c.classList.contains('nav-group')) ids.push(navIdent(c));
+    });
+    try { localStorage.setItem(NAV_ORDER_KEY, JSON.stringify(ids)); } catch (e) {}
+  }
+  function applyNavOrder() {
+    var menu = U.$('#navMenu'); if (!menu) return;
+    var raw; try { raw = localStorage.getItem(NAV_ORDER_KEY); } catch (e) { raw = null; }
+    if (!raw) return;
+    var ids; try { ids = JSON.parse(raw); } catch (e) { return; }
+    if (!ids || !ids.length) return;
+    ids.forEach(function (id) {
+      var sel = id.indexOf('group:') === 0 ? '.nav-group[data-group="' + id.slice(6) + '"]' : '.nav-item[data-page="' + id.slice(5) + '"]';
+      var el = menu.querySelector(sel);
+      if (el) menu.appendChild(el); // 按存储顺序依次移到末尾，最终顺序即等于 ids
+    });
+  }
+  function moveNavEl(el, dir) {
+    if (dir < 0) {
+      var prev = el.previousElementSibling;
+      if (prev && (prev.classList.contains('nav-item') || prev.classList.contains('nav-group'))) el.parentNode.insertBefore(el, prev);
+    } else {
+      var next = el.nextElementSibling;
+      if (next && (next.classList.contains('nav-item') || next.classList.contains('nav-group'))) el.parentNode.insertBefore(next, el);
+    }
+    saveNavOrder();
+  }
+  function setupNavSort() {
+    var btn = U.$('#navSortBtn'); if (!btn) return;
+    var menu = U.$('#navMenu');
+    btn.addEventListener('click', function () {
+      var on = menu.classList.toggle('sorting');
+      btn.classList.toggle('active', on);
+      btn.textContent = on ? '✓ 完成排序' : '≡ 排序类目';
+      if (on) {
+        Array.prototype.forEach.call(menu.children, function (c) {
+          if (!(c.classList.contains('nav-item') || c.classList.contains('nav-group'))) return;
+          if (c.querySelector('.nav-handle')) return;
+          var h = U.el('div', { class: 'nav-handle' });
+          h.appendChild(U.el('button', { class: 'nav-move', text: '↑', title: '上移', onclick: function (e) { e.stopPropagation(); moveNavEl(c, -1); } }));
+          h.appendChild(U.el('button', { class: 'nav-move', text: '↓', title: '下移', onclick: function (e) { e.stopPropagation(); moveNavEl(c, 1); } }));
+          c.insertBefore(h, c.firstChild);
+        });
+      } else {
+        Array.prototype.forEach.call(menu.querySelectorAll('.nav-handle'), function (h) { h.remove(); });
+        U.toast('类目顺序已保存');
+      }
+    });
+  }
+  applyNavOrder();
+  setupNavSort();
 
   /* ---------- 启动 ---------- */
   S.ensureDailyReset();
