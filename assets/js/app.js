@@ -131,6 +131,7 @@
     }
 
     body.appendChild(U.el('button', { class: 'btn ghost sm', style: 'margin-top:10px', text: '立即执行一次重置（演示）', onclick: function () { S.forceReset(); U.toast('已重置'); navigate(current); close(); } }));
+    body.appendChild(U.el('button', { class: 'btn ghost sm', style: 'margin-top:10px', text: '🔄 检查更新', onclick: function () { if (App.checkForUpdate) App.checkForUpdate(); else U.toast('当前环境不支持'); } }));
 
     var close;
     var m = U.modal({ title: '存储设置', body: body, actions: [{ label: '关闭', primary: true, onClick: function () {} }] });
@@ -190,10 +191,37 @@
   function registerSW() {
     if (!('serviceWorker' in navigator)) return;
     if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return;
-    window.addEventListener('load', function () {
-      navigator.serviceWorker.register('sw.js').catch(function () {});
+    var refreshing = false;
+    function showUpdateBar(waiting) {
+      if (U.$('#swUpdateBar')) return;
+      var bar = U.el('div', { id: 'swUpdateBar', style: 'position:fixed;left:0;right:0;bottom:0;z-index:9999;background:var(--accent);color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;font-size:14px;box-shadow:0 -2px 8px rgba(0,0,0,.2)' });
+      bar.appendChild(U.el('span', { text: '🔄 发现新版本，点击刷新获取最新功能' }));
+      bar.appendChild(U.el('button', { class: 'btn', style: 'background:#fff;color:var(--accent);border:none;margin-left:12px;flex:none', text: '立即刷新', onclick: function () { waiting.postMessage({ type: 'SKIP_WAITING' }); } }));
+      document.body.appendChild(bar);
+    }
+    navigator.serviceWorker.register('sw.js').then(function (reg) {
+      window.__swReg = reg;
+      if (reg.waiting) showUpdateBar(reg.waiting);
+      reg.addEventListener('updatefound', function () {
+        var nw = reg.installing; if (!nw) return;
+        nw.addEventListener('statechange', function () {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) showUpdateBar(nw);
+        });
+      });
+    }).catch(function () {});
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (refreshing) return; refreshing = true; location.reload();
     });
   }
+  // 手动「检查更新」：强制浏览器重新校验 sw.js；有新版本则提示刷新
+  App.checkForUpdate = function () {
+    if (!window.__swReg) { U.toast('正在初始化，请稍后再试'); return; }
+    U.toast('正在检查更新…');
+    window.__swReg.update().then(function () {
+      if (window.__swReg.waiting) U.toast('已有新版本，点底部「立即刷新」');
+      else U.toast('已是最新版本');
+    }).catch(function () { U.toast('检查更新失败，请稍后重试'); });
+  };
 
   // 登录表单
   var loginMode = 'signin';

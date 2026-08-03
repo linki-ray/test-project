@@ -49,6 +49,17 @@ App.pages = App.pages || {};
     '盐':0,'生抽':63,'老抽':71,'酱油':63,'蚝油':110,'醋':31,'米醋':31,'香醋':31,'白醋':31,'糖':400,'白糖':400,'冰糖':397,'蜂蜜':304,'料酒':114,'黄酒':100,'白酒':298,'豆瓣酱':200,'甜面酱':220,'番茄酱':82,'沙拉酱':380,'花生酱':594,'芝麻酱':618,'咖喱':210,'淀粉':350,'生粉':350,
     '牛奶':54,'纯牛奶':54,'酸奶':72,'芝士':328,'奶酪':328,'淡奶油':346,'炼乳':331,'巧克力':546,'可可粉':320,'咖啡':2,'花生':567,'核桃':654,'杏仁':579,'腰果':553,'瓜子':608,'坚果':600
   };
+  // 扩充常见食物（权威公开营养参考值，每 100g kcal）——覆盖水果/坚果/主食/熟食/肉禽/酒饮等，提升自选菜品自动估算准确度
+  var FOOD_CAL_EXTRA = {
+    '燕麦':389,'小米':361,'荞麦':337,'藜麦':368,'芋头':79,'板栗':185,'魔芋':10,'凉皮':110,'烧麦':220,'包子':220,'馄饨':250,'汤圆':310,'披萨':266,'汉堡':292,'寿司':150,'鸭肉':240,'鹅肉':290,'鸽子':220,'午餐肉':220,'火腿':330,'鸡爪':215,'墨鱼':82,'蚬':47,'蛏子':59,
+    '葡萄':43,'苹果':52,'香蕉':89,'梨':50,'橙子':47,'柚子':42,'草莓':32,'蓝莓':57,'西瓜':30,'哈密瓜':34,'桃子':39,'樱桃':46,'荔枝':66,'芒果':60,'菠萝':50,'猕猴桃':61,'火龙果':60,'榴莲':147,'椰子':241,'木瓜':30,'杏':36,'杨梅':30,'桑葚':36,
+    '巴旦木':579,'碧根果':692,'松子':698,'榛子':628,'夏威夷果':718,'开心果':562,'南瓜子':582,'亚麻籽':534,'黑芝麻':559,'白芝麻':517,
+    '蛋糕':348,'甜甜圈':452,'饼干':433,'曲奇':502,'奶茶':70,'珍珠奶茶':90,'可乐':43,'雪碧':41,'橙汁':45,'啤酒':43,'红酒':85,'威士忌':250,
+    '糙米':368,'黑米':341,'红米':359,'薏米':357,'红豆':324,'绿豆':316,'黑豆':341,'芸豆':333,'鹰嘴豆':364,'扁豆':339,
+    '煎饼':333,'手抓饼':350,'葱油饼':350,'油条':388,'麻花':524,'桃酥':480,'月饼':430,'粽子':278,
+    '米粉':350,'米线':350,'螺蛳粉':350,'热干面':200,'炸酱面':250,'炒饭':220,'盖浇饭':300,'沙拉':80,'三明治':250,'比萨':266
+  };
+  Object.assign(FOOD_CAL, FOOD_CAL_EXTRA);
   // 计数单位默认单重（克/个）——用于「1个/根/瓣」等无质量单位
   var PER_UNIT = {
     '鸡蛋':50,'番茄':150,'西红柿':150,'土豆':150,'黄瓜':200,'洋葱':150,'青椒':100,'茄子':200,
@@ -583,13 +594,37 @@ App.pages = App.pages || {};
         if (goal === 'muscle') return Math.round(tdee + 300);
         return tdee;
       }
+      // 一道菜常见食材的「一份典型用量（克）」——按分量估算，而非简单累加每百克
+      var DISH_PORTION = {
+        '米饭':150,'面条':200,'馒头':100,'面包':80,'粥':300,'粉':200,'饺子':100,'包子':100,'馄饨':100,'米线':200,'米粉':200,'年糕':100,
+        '鸡蛋':50,'番茄':120,'西红柿':120,'黄瓜':100,'土豆':120,'猪肉':80,'鸡肉':100,'牛肉':100,'羊肉':80,'鱼':120,'虾':80,'豆腐':100,
+        '青菜':150,'白菜':150,'菠菜':120,'茄子':120,'青椒':80,'胡萝卜':80,'洋葱':60,'冬瓜':200,'南瓜':150,'玉米':100,'木耳':10,'香菇':30,
+        '油':10,'食用油':10,'苹果':150,'香蕉':120,'橙子':150
+      };
       function estimateFromName(name) {
         var keys = Object.keys(FOOD_CAL).sort(function (a, b) { return b.length - a.length; });
         var total = 0, found = [], covered = name;
         keys.forEach(function (k) {
-          if (covered.indexOf(k) > -1) { total += FOOD_CAL[k]; found.push(k); covered = covered.replace(k, ' '); }
+          if (covered.indexOf(k) > -1) {
+            var g = DISH_PORTION[k] || 50;
+            total += Math.round(FOOD_CAL[k] * g / 100);
+            found.push(k); covered = covered.replace(k, ' ');
+          }
         });
-        return { kcal: total, found: found };
+        if (!found.length) return { kcal: 0, found: [] };
+        // 烹饪用油修正：炒/炸/煎/红烧等约 10g 油(+90kcal)；拌/沙拉约 6g(+50kcal)；蒸/煮/汤少量
+        if (/炒|炸|煎|红烧|干锅|爆|溜|烩|焖/.test(name)) total += 90;
+        else if (/拌|沙拉|凉拌|白灼|灼/.test(name)) total += 50;
+        else total += 30;
+        return { kcal: Math.round(total), found: found };
+      }
+      function dishTypeDefault(name) {
+        if (/饭|面|粥|粉|饼|包|馄饨|饺子|米线|盖浇|炒饭|炒面/.test(name)) return 350;
+        if (/汤|羹/.test(name)) return 120;
+        if (/沙拉|凉拌|凉菜|拌/.test(name)) return 150;
+        if (/蛋糕|奶茶|甜点|饼干|巧克力|冰淇淋|糖水|甜/.test(name)) return 300;
+        if (/炸|煎|红烧|干锅|烧烤|烤|麻辣/.test(name)) return 400;
+        return 250; // 普通家常炒菜默认
       }
       function findRecipeByName(name) {
         var all = RECIPES.concat(getImported());
@@ -642,28 +677,31 @@ App.pages = App.pages || {};
 
       function addDishModal(person) {
         var body = U.el('div');
-        var nameI = U.el('input', { class: 'input', placeholder: '输入菜名（可搜菜谱库自动估算）' });
+        var nameI = U.el('input', { class: 'input', placeholder: '输入菜名，系统自动算热量（无需手填）' });
         var mealSel = U.el('select', { class: 'input', style: 'margin-top:8px' }, [
           U.el('option', { value: 'breakfast', text: '早餐' }), U.el('option', { value: 'lunch', text: '午餐' }), U.el('option', { value: 'dinner', text: '晚餐' })
         ]);
         var estBox = U.el('div', { class: 'muted', style: 'margin-top:8px;font-size:13px' });
-        var kcalI = U.el('input', { class: 'input', type: 'number', placeholder: '卡路里 kcal（可改）', style: 'margin-top:8px' });
-        body.appendChild(nameI); body.appendChild(mealSel); body.appendChild(estBox); body.appendChild(kcalI);
+        body.appendChild(nameI); body.appendChild(mealSel); body.appendChild(estBox);
         function recalc() {
-          var nm = nameI.value.trim(); if (!nm) { estBox.textContent = ''; kcalI.value = ''; return; }
+          var nm = nameI.value.trim(); if (!nm) { estBox.textContent = ''; return; }
           var r = findRecipeByName(nm);
-          if (r) { var c = dishCalories(r).total; estBox.textContent = '匹配菜谱「' + r.name + '」估算约 ' + c + ' kcal'; kcalI.value = c; }
-          else { var e = estimateFromName(nm); if (e.kcal > 0) { estBox.textContent = '按食材关键词估算约 ' + e.kcal + ' kcal（' + e.found.join('、') + '）'; kcalI.value = e.kcal; } else { estBox.textContent = '未识别到热量，请手动填写'; kcalI.value = ''; } }
+          if (r) { var c = dishCalories(r).total; estBox.textContent = '系统自动估算约 ' + c + ' kcal'; }
+          else { var e = estimateFromName(nm); if (e.kcal > 0) estBox.textContent = '系统自动估算约 ' + e.kcal + ' kcal（' + e.found.join('、') + '）'; else estBox.textContent = '系统自动估算约 ' + dishTypeDefault(nm) + ' kcal'; }
         }
         nameI.addEventListener('input', recalc);
         function confirm() {
           var nm = nameI.value.trim(); if (!nm) { U.toast('请输入菜名'); return; }
-          var kcal = parseFloat(kcalI.value); if (isNaN(kcal) || kcal < 0) { U.toast('请输入有效卡路里'); return; }
+          var kcal, src;
+          var r = findRecipeByName(nm);
+          if (r) { kcal = dishCalories(r).total; }
+          else { var e = estimateFromName(nm); kcal = e.kcal > 0 ? e.kcal : dishTypeDefault(nm); }
+          kcal = Math.round(kcal);
           var log = getLog(person); var d = S.todayStr();
           if (!log[d]) log[d] = { breakfast: [], lunch: [], dinner: [] };
-          log[d][mealSel.value].push({ name: nm, kcal: Math.round(kcal) });
+          log[d][mealSel.value].push({ name: nm, kcal: kcal });
           setLog(person, log);
-          U.toast('已记录到 ' + person + ' 的' + MEAL[mealSel.value]);
+          U.toast('已自动记录 ' + kcal + ' kcal 到 ' + person + ' 的' + MEAL[mealSel.value]);
           paint();
         }
         U.modal({ title: '添加菜品 · ' + person, body: body, actions: [{ label: '添加', primary: true, onClick: confirm }, { label: '取消', onClick: function () {} }] });

@@ -183,7 +183,7 @@ App.pages = App.pages || {};
     var view = 'hot'; // hot | stock
 
     var tabBar = U.el('div', { class: 'filter-bar', id: 'finTabs' });
-    [['hot', 'A股股票热点'], ['stock', '个股分析查询']].forEach(function (t) {
+    [['hot', 'A股股票热点'], ['stock', '个股分析查询'], ['premarket', '盘前早知道']].forEach(function (t) {
       tabBar.appendChild(U.el('span', { class: 'tag' + (view === t[0] ? ' active' : ''), text: t[1], onclick: function () { view = t[0]; renderTabs(); box.innerHTML = ''; renderView(); } }));
     });
     root.appendChild(tabBar);
@@ -193,12 +193,13 @@ App.pages = App.pages || {};
     function renderTabs() {
       U.$all('#finTabs .tag').forEach(function (t) { /* active managed by text match */ });
       U.clear(tabBar);
-      [['hot', 'A股股票热点'], ['stock', '个股分析查询']].forEach(function (t) {
+      [['hot', 'A股股票热点'], ['stock', '个股分析查询'], ['premarket', '盘前早知道']].forEach(function (t) {
         tabBar.appendChild(U.el('span', { class: 'tag' + (view === t[0] ? ' active' : ''), text: t[1], onclick: function () { view = t[0]; renderTabs(); box.innerHTML = ''; renderView(); } }));
       });
     }
     function renderView() {
       if (view === 'hot') renderHot(box);
+      else if (view === 'premarket') renderPremarket(box);
       else renderStock(box);
     }
     renderView();
@@ -397,6 +398,114 @@ App.pages = App.pages || {};
     function saveSnap(key, val) {
       var snap = S.get('fin_snap_' + S.todayStr()) || {}; snap[key] = val; S.set('fin_snap_' + S.todayStr(), snap);
     }
+  }
+
+  /* ------------------- 4.2 盘前早知道（外围复盘 + 盘前新闻/公告） ------------------- */
+  // 外围市场：腾讯行情紧凑格式（s_ 前缀），price/chg/chgPct 在固定位置，涨红跌绿
+  function jsonpPremarket(secids) {
+    return new Promise(function (resolve) {
+      var s = document.createElement('script');
+      s.src = 'https://qt.gtimg.cn/q=' + secids;
+      s.onload = function () {
+        var out = [];
+        secids.split(',').forEach(function (code) {
+          var raw = window['v_' + code];
+          if (typeof raw === 'string' && raw.indexOf('~') > -1) {
+            var p = raw.split('~');
+            out.push({ code: code, name: p[1] || '', price: parseFloat(p[3]) || 0, chg: parseFloat(p[4]) || 0, chgPct: parseFloat(p[5]) || 0 });
+          }
+        });
+        resolve(out); s.remove();
+      };
+      s.onerror = function () { resolve([]); s.remove(); };
+      document.body.appendChild(s);
+    });
+  }
+
+  function renderPremarket(root) {
+    var wrap = U.el('div');
+
+    // 卡片1：外围市场复盘（美股 + 港股隔夜）
+    var ovCard = U.el('div', { class: 'card' });
+    ovCard.appendChild(U.el('div', { class: 'card-title' }, [
+      document.createTextNode('外围市场复盘（隔夜）'),
+      U.el('span', { class: 'src-tag', id: 'ovSrc' }),
+      U.el('button', { class: 'btn ghost xs', style: 'float:right;margin-top:-2px', text: '🔄 刷新', onclick: function () { loadOverview(true); } })
+    ]));
+    var ovBox = U.el('div'); ovCard.appendChild(ovBox);
+    wrap.appendChild(ovCard);
+
+    // 卡片2：盘前重要新闻 / 公告
+    var newsCard = U.el('div', { class: 'card' });
+    newsCard.appendChild(U.el('div', { class: 'card-title' }, [
+      document.createTextNode('盘前重要新闻 / 公告'),
+      U.el('span', { class: 'src-tag', id: 'pmSrc' }),
+      U.el('button', { class: 'btn ghost xs', style: 'float:right;margin-top:-2px', text: '🔄 刷新', onclick: function () { loadPreNews(true); } })
+    ]));
+    var policyBox = U.el('div'); var annBox = U.el('div');
+    newsCard.appendChild(U.el('div', { class: 'card-sub', text: '📋 政策 / 宏观' }));
+    newsCard.appendChild(policyBox);
+    newsCard.appendChild(U.el('div', { class: 'card-sub', style: 'margin-top:8px', text: '🏢 公司公告 / 快讯' }));
+    newsCard.appendChild(annBox);
+    wrap.appendChild(newsCard);
+
+    root.appendChild(wrap);
+
+    function showOverview(list) {
+      U.clear(ovBox);
+      var grid = U.el('div', { class: 'grid c3' });
+      list.forEach(function (x) {
+        var up = x.chgPct >= 0;
+        var c = U.el('div', { class: 'stat-card', style: 'text-align:left' });
+        c.appendChild(U.el('div', { style: 'font-weight:700;font-size:13px', text: x.name }));
+        c.appendChild(U.el('div', { style: 'font-size:18px;font-weight:800;margin:4px 0 2px;color:' + (up ? 'var(--red)' : 'var(--green)'), text: x.price.toFixed(2) }));
+        c.appendChild(U.el('div', { style: 'font-size:12px;font-weight:700;color:' + (up ? 'var(--red)' : 'var(--green)'), text: (up ? '+' : '') + x.chgPct.toFixed(2) + '%' }));
+        grid.appendChild(c);
+      });
+      ovBox.appendChild(grid);
+    }
+    function showPreNews(items) {
+      U.clear(policyBox); U.clear(annBox);
+      if (!items || !items.length) { policyBox.appendChild(U.el('div', { class: 'empty', text: '暂无' })); return; }
+      items.slice(0, 14).forEach(function (n) {
+        var isPolicy = /政策|央行|国务院|发改委|财政|货币|降准|降息|两会|会议|发文|印发|监管|证监会|交易所/.test(n.title);
+        var box = isPolicy ? policyBox : annBox;
+        var r = U.el('div', { class: 'quote-row' });
+        r.appendChild(U.el('div', {}, [
+          U.el('div', { style: 'cursor:pointer;font-size:13px', text: n.title, onclick: function () { if (n.url) window.open(n.url, '_blank'); } }),
+          U.el('div', { class: 'muted', text: n.time })
+        ]));
+        box.appendChild(r);
+      });
+    }
+    function loadOverview(manual) {
+      if (manual) U.$('#ovSrc').innerHTML = '<span class="live-dot wait"></span> 刷新中…';
+      jsonpPremarket('s_usDJI,s_usIXIC,s_usSPX,s_hkHSI,s_hkHSCEI,s_hk00700,s_usBABA,s_usPDD,s_usNIO')
+        .then(function (list) {
+          if (!list.length) throw new Error('empty');
+          showOverview(list);
+          U.$('#ovSrc').innerHTML = '<span class="live-dot on"></span> 腾讯实时';
+        }).catch(function () { U.$('#ovSrc').innerHTML = '<span class="live-dot off"></span> 获取失败'; });
+    }
+    function loadPreNews(manual) {
+      if (manual) U.$('#pmSrc').innerHTML = '<span class="live-dot wait"></span> 刷新中…';
+      var cached = S.get('fin_premarket_' + S.todayStr());
+      if (cached && !manual) { showPreNews(cached); U.$('#pmSrc').innerHTML = '<span class="live-dot on"></span> 金十'; return; }
+      U.fetchJSON('/api/flash?num=40', 12000)
+        .then(function (j) {
+          if (!j || !j.ok || !j.items || !j.items.length) throw new Error('empty');
+          S.set('fin_premarket_' + S.todayStr(), j.items);
+          showPreNews(j.items); U.$('#pmSrc').innerHTML = '<span class="live-dot on"></span> 金十';
+        })
+        .catch(function () {
+          // 兜底：新浪财经快讯
+          U.fetchJSON('/api/news?num=20', 12000).then(function (j) {
+            if (j && j.ok && j.items && j.items.length) { S.set('fin_premarket_' + S.todayStr(), j.items); showPreNews(j.items); U.$('#pmSrc').innerHTML = '<span class="live-dot on"></span> 新浪(兜底)'; }
+            else U.$('#pmSrc').innerHTML = '<span class="live-dot off"></span> 获取失败';
+          }).catch(function () { U.$('#pmSrc').innerHTML = '<span class="live-dot off"></span> 获取失败'; });
+        });
+    }
+    loadOverview(); loadPreNews();
   }
 
   /* ------------------- 4.3 个股分析查询 ------------------- */
