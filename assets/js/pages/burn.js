@@ -12,22 +12,47 @@
   App.pages['burn'] = function (root) {
     U.clear(root);
 
-    /* ---------- 存储键 ---------- */
+    /* ---------- 分人（狐狸 / RAY） ---------- */
+    var PERSONS = [{ id: 'fox', name: '狐狸' }, { id: 'ray', name: 'RAY' }];
+    var curPerson = S.get('burn_person', 'fox');
+    function personName(id) { var p = PERSONS.filter(function (x) { return x.id === id; })[0]; return p ? p.name : id; }
+
+    /* ---------- 存储键（按人隔离） ---------- */
     var K_PROFILE = 'burn_profile', K_WEIGHT = 'burn_weight', K_DIET = 'burn_diet', K_EX = 'burn_ex', K_FAV = 'burn_fav';
+    function K(base) { return base + '_' + curPerson; }
     var today = S.todayStr();
 
-    var profile = S.get(K_PROFILE, null);
-    if (!profile) profile = { sex: '女', height: 161, initW: 62, curW: 60, goalW: 55, age: 28, act: 1.375, deficit: 500 };
-    var weight = S.get(K_WEIGHT, []);
-    var diet = S.get(K_DIET, {});
-    var ex = S.get(K_EX, {});
-    var fav = S.get(K_FAV, []);
+    /* 一次性迁移：旧单人数据 → 狐狸 */
+    (function migrate() {
+      if (S.get('burn_profile', null) != null && S.get('burn_profile_fox', null) == null) {
+        ['burn_profile', 'burn_weight', 'burn_diet', 'burn_ex', 'burn_fav'].forEach(function (k) {
+          var v = S.get(k, null);
+          if (v != null) S.set(k + '_fox', v);
+          if (S.remove) S.remove(k);
+        });
+      }
+    })();
 
-    function saveProfile() { S.set(K_PROFILE, profile); }
-    function saveWeight() { S.set(K_WEIGHT, weight); }
-    function saveDiet() { S.set(K_DIET, diet); }
-    function saveEx() { S.set(K_EX, ex); }
-    function saveFav() { S.set(K_FAV, fav); }
+    var profile, weight, diet, ex, fav;
+    function defaultProfile(id) {
+      if (id === 'ray') return { sex: '女', height: 150, initW: 54.5, curW: 54.5, goalW: 50, age: 28, act: 1.375, deficit: 500 };
+      return { sex: '女', height: 161, initW: 62, curW: 60, goalW: 55, age: 28, act: 1.375, deficit: 500 };
+    }
+    function loadPerson() {
+      profile = S.get(K(K_PROFILE), null);
+      if (!profile) profile = defaultProfile(curPerson);
+      weight = S.get(K(K_WEIGHT), []);
+      diet = S.get(K(K_DIET), {});
+      ex = S.get(K(K_EX), {});
+      fav = S.get(K(K_FAV), []);
+    }
+    loadPerson();
+
+    function saveProfile() { S.set(K(K_PROFILE), profile); }
+    function saveWeight() { S.set(K(K_WEIGHT), weight); }
+    function saveDiet() { S.set(K(K_DIET), diet); }
+    function saveEx() { S.set(K(K_EX), ex); }
+    function saveFav() { S.set(K(K_FAV), fav); }
 
     function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
     function round(x) { return Math.round(x); }
@@ -54,6 +79,19 @@
     function pushDiet(entry) { entry.id = uid(); if (!diet[today]) diet[today] = []; diet[today].push(entry); saveDiet(); }
     function pushEx(entry) { entry.id = uid(); if (!ex[today]) ex[today] = []; ex[today].push(entry); saveEx(); }
 
+    /* ---------- 分人切换（狐狸 / RAY） ---------- */
+    var pbar = U.el('div', { class: 'seg', style: 'display:flex;gap:0;margin-bottom:12px' });
+    PERSONS.forEach(function (p) {
+      var b = U.el('button', { class: 'seg-btn' + (p.id === curPerson ? ' active' : ''), text: p.name });
+      b.onclick = function () {
+        curPerson = p.id; S.set('burn_person', curPerson);
+        U.$all('.seg-btn', pbar).forEach(function (x) { x.classList.toggle('active', x.textContent === p.name); });
+        render();
+      };
+      pbar.appendChild(b);
+    });
+    root.appendChild(pbar);
+
     /* ---------- 顶部 tab 栏 ---------- */
     var TABS = [['dash', '仪表盘'], ['base', '基础信息'], ['diet', '饮食记录'], ['ex', '运动记录'], ['stat', '数据统计']];
     var cur = 'dash';
@@ -67,11 +105,12 @@
     var panel = U.el('div');
     root.appendChild(panel);
 
-    function render() { U.clear(panel); if (cur === 'dash') panel.appendChild(renderDash()); else if (cur === 'base') panel.appendChild(renderBase()); else if (cur === 'diet') panel.appendChild(renderDiet()); else if (cur === 'ex') panel.appendChild(renderEx()); else panel.appendChild(renderStat()); }
+    function render() { loadPerson(); U.clear(panel); if (cur === 'dash') panel.appendChild(renderDash()); else if (cur === 'base') panel.appendChild(renderBase()); else if (cur === 'diet') panel.appendChild(renderDiet()); else if (cur === 'ex') panel.appendChild(renderEx()); else panel.appendChild(renderStat()); }
 
     /* ===== ④ 每日仪表盘 ===== */
     function renderDash() {
       var wrap = U.el('div');
+      wrap.appendChild(U.el('div', { class: 'muted', style: 'margin-bottom:10px', text: '当前查看：' + personName(curPerson) + ' 的数据' }));
       var dArr = dayDiet(today), eArr = dayEx(today);
       var inK = sumK(dArr), exK = sumK(eArr);
       var tgt = target();
