@@ -450,10 +450,14 @@ App.pages = App.pages || {};
       actions.appendChild(U.el('button', { class: 'btn sm', text: '📋 复制全文', onclick: function () { copyText(buildGuideText(dishes)); } }));
       actions.appendChild(U.el('button', { class: 'btn ghost sm', text: '⬇ 下载TXT', onclick: function () { U.download('做菜指南_' + S.todayStr() + '.txt', buildGuideText(dishes), 'text/plain;charset=utf-8'); } }));
       actions.appendChild(U.el('button', { class: 'btn ghost sm', text: '⭐ 存到灵感', onclick: function () { saveToInspiration(dishes); } }));
+      actions.appendChild(U.el('button', { class: 'btn primary sm', text: '🍽️ 加入饮食记录', onclick: function () { addGuideToBurn(); } }));
       body.appendChild(actions);
 
       // 就餐人数选择器（默认 2 人，中餐家常菜普遍 2 人份）
-      var personRow = U.el('div', { class: 'row', style: 'margin-bottom:10px;align-items:center' });
+      var personCount = 2;
+      var targetPerson = 'fox';
+      var targetMeal = '午餐';
+      var personRow = U.el('div', { class: 'row', style: 'margin-bottom:10px;align-items:center;flex-wrap:wrap' });
       personRow.appendChild(U.el('span', { class: 'muted', style: 'margin-right:4px', text: '就餐人数：' }));
       [1,2,3,4].forEach(function (n) {
         personRow.appendChild(U.el('span', { class: 'tag' + (n === 2 ? ' active' : ''), id: 'pc-' + n, text: n + '人', onclick: function () {
@@ -461,6 +465,40 @@ App.pages = App.pages || {};
         } }));
       });
       body.appendChild(personRow);
+
+      // 计入燃烧卡路里：选择人物 + 餐次
+      var burnRow = U.el('div', { class: 'row', style: 'margin-bottom:10px;align-items:center;flex-wrap:wrap;gap:8px' });
+      burnRow.appendChild(U.el('span', { class: 'muted', text: '计入：' }));
+      var PERSONS = [['fox', '狐狸'], ['ray', 'RAY']];
+      PERSONS.forEach(function (p) {
+        burnRow.appendChild(U.el('span', { class: 'tag' + (p[0] === targetPerson ? ' active' : ''), id: 'bp-' + p[0], text: p[1], onclick: function () {
+          targetPerson = p[0]; PERSONS.forEach(function (q) { var e = U.$('#bp-' + q[0]); if (e) e.classList.toggle('active', q[0] === targetPerson); });
+        } }));
+      });
+      burnRow.appendChild(U.el('span', { class: 'muted', style: 'margin-left:8px', text: '餐次：' }));
+      var MEALS = ['早餐', '午餐', '晚餐', '加餐'];
+      MEALS.forEach(function (m) {
+        burnRow.appendChild(U.el('span', { class: 'tag' + (m === targetMeal ? ' active' : ''), id: 'bm-' + m, text: m, onclick: function () {
+          targetMeal = m; MEALS.forEach(function (n) { var e = U.$('#bm-' + n); if (e) e.classList.toggle('active', n === targetMeal); });
+        } }));
+      });
+      body.appendChild(burnRow);
+
+      function addGuideToBurn() {
+        var totalC = dishes.reduce(function (s, d) { return s + dishCalories(d).total; }, 0);
+        var per = Math.round(totalC / personCount);
+        if (!per || per <= 0) { U.toast('本餐暂无估算热量'); return; }
+        var names = dishes.map(function (d) { return d.name; }).slice(0, 3).join('、') + (dishes.length > 3 ? '等' + dishes.length + '道菜' : '');
+        var entry = { name: '做菜指南：' + names, kcal: per, p: 0, c: 0, f: 0, meal: targetMeal, src: 'guide', qty: 1 };
+        var key = 'burn_diet_' + targetPerson;
+        var today = S.todayStr();
+        var data = S.get(key, {});
+        if (!data[today]) data[today] = [];
+        entry.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        data[today].push(entry);
+        S.set(key, data);
+        U.toast('已将 ' + per + ' kcal 计入「' + (targetPerson === 'ray' ? 'RAY' : '狐狸') + '」的' + targetMeal);
+      }
 
       groups.forEach(function (g) {
         var list = dishes.filter(function (d) { return g[0] === 'other' ? (d.type !== 'meat' && d.type !== 'veg' && d.type !== 'soup') : d.type === g[0]; });

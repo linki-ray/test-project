@@ -345,7 +345,8 @@
 
     function dietRow(x) {
       var row = U.el('div', { class: 'row', style: 'justify-content:space-between;align-items:center;padding:8px 0;border-bottom:0.5px solid var(--border-3);font-size:13px' });
-      row.appendChild(U.el('div', {}, [U.el('div', { text: x.meal + ' · ' + x.name }), U.el('div', { class: 'muted', style: 'font-size:12px', text: 'P' + x.p + ' C' + x.c + ' F' + x.f + (x.manual ? '（手动）' : '') })]));
+      var sub = x.src === 'guide' ? '来自做菜指南 · 仅热量估算' : 'P' + x.p + ' C' + x.c + ' F' + x.f + (x.manual ? '（手动）' : '');
+      row.appendChild(U.el('div', {}, [U.el('div', { text: x.meal + ' · ' + x.name }), U.el('div', { class: 'muted', style: 'font-size:12px', text: sub })]));
       var right = U.el('div', { style: 'display:flex;align-items:center;gap:8px' });
       right.appendChild(U.el('span', { text: x.kcal + ' kcal' }));
       right.appendChild(U.el('button', { class: 'tag', text: '改', onclick: function () { editKcal(x); } }));
