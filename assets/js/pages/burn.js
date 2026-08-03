@@ -1,13 +1,14 @@
 /* =========================================================
    燃烧卡路里 · 一级目录（六大模块）
    ① 基础信息  ② 饮食记录  ③ 运动消耗  ④ 每日仪表盘  ⑤ 数据统计复盘
-   约束：所有记录永久保存，不提供删除；生/熟区分（熟食靠原料拆分计算）。
-   数据源：window.BURN_DATA（《中国食物成分表 第6版》生鲜值）。
+   约束：生/熟区分（熟食靠原料拆分计算）；饮食记录允许删除。
+   数据源：window.FOOD_DB（统一食物库，含《中国食物成分表》权威值）。
    ========================================================= */
 (function () {
   var U = App.U, S = App.Store;
-  var D = window.BURN_DATA;
-  if (!D) { console.error('BURN_DATA 未加载'); return; }
+  var DB = window.FOOD_DB;
+  if (!DB) { console.error('FOOD_DB 未加载'); return; }
+  var D = DB; // 兼容旧引用
 
   App.pages['burn'] = function (root) {
     U.clear(root);
@@ -57,11 +58,37 @@
     function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
     function round(x) { return Math.round(x); }
     function kcalPCF(p, c, f) { return p * 4 + c * 4 + f * 9; }
+
+    /* ---------- 数量/单位解析 ---------- */
+    var VAGUE = { '少许':3,'少量':5,'适量':10,'若干':5,'一点':3,'一点点':2,'几滴':2,'半勺':2.5,'半碗':100,'一碗':200,'一勺':10,'一匙':10,'一茶勺':5,'一汤勺':15,'一小勺':5,'一大勺':15 };
+    var UNIT_G = { '克':1,'g':1,'G':1,'千克':1000,'kg':1000,'公斤':1000,'斤':500,'两':50,'ml':1,'毫升':1,'升':1000,'l':1000,'L':1000 };
+    var COUNT_UNITS = ['个','只','根','把','片','块','碗','杯','勺','匙','瓣','条','盒','包','袋','颗','粒','条','根','尾','只'];
+    function parseQty(raw, canonical) {
+      var s = (raw || '').toString().trim().replace(/\s+/g, '');
+      if (!s) return 0;
+      if (VAGUE[s] != null) return VAGUE[s];
+      var m = s.match(/^(\d+\.?\d*)\s*([a-zA-Z\u4e00-\u9fa5]+)$/);
+      if (m) {
+        var n = parseFloat(m[1]), u = m[2];
+        if (UNIT_G[u]) return n * UNIT_G[u];
+        if (COUNT_UNITS.indexOf(u) !== -1) {
+          if ((u === '勺' || u === '匙') && canonical) {
+            if (/油|酱|醋|酒|汁|生抽|老抽|蚝油|料酒|黄酒|汤/.test(canonical)) return n * 10;
+            if (/糖|淀粉|生粉|面粉/.test(canonical)) return n * 8;
+            return n * 10;
+          }
+          if (u === '碗') return n * 150;
+          var base = (canonical && DB.PER_UNIT[canonical]) || (canonical && DB.PER_UNIT[canonical.replace(/肉$/, '')]) || 0;
+          return n * (base || 50);
+        }
+      }
+      var num = parseFloat(s);
+      if (!isNaN(num)) return num;
+      return 0;
+    }
+
     function resolve(name) {
-      var n = (name || '').trim();
-      if (D.FOODS[n]) return D.FOODS[n];
-      if (D.ALIAS[n] && D.FOODS[D.ALIAS[n]]) return D.FOODS[D.ALIAS[n]];
-      return null;
+      return DB.lookup(name);
     }
 
     /* ---------- 生理计算 ---------- */
@@ -263,25 +290,33 @@
       var sCard = U.el('div', { class: 'card' });
       sCard.appendChild(U.el('div', { class: 'card-sub', text: '① 单品食材录入（生重优先）' }));
       var nameI = U.el('input', { class: 'input', placeholder: '食材名称，自动查表', style: 'margin-top:6px' });
-      var wI = U.el('input', { class: 'input', type: 'number', placeholder: '重量 g', style: 'margin-top:6px' });
+      var wI = U.el('input', { class: 'input', placeholder: '重量/数量，如 50g / 1个 / 1勺', style: 'margin-top:6px' });
       var autoBox = U.el('div', { class: 'muted', style: 'margin-top:6px;font-size:12px' });
       var manualI = U.el('input', { class: 'input', type: 'number', placeholder: '未在表中？手动填热量 kcal', style: 'margin-top:6px;display:none' });
       nameI.oninput = fillAuto;
+      wI.oninput = fillAuto;
       function fillAuto() {
         var std = resolve(nameI.value);
-        if (std) { autoBox.textContent = '每100g：蛋白 ' + std.p + 'g / 碳水 ' + std.c + 'g / 脂肪 ' + std.f + 'g → ' + round(kcalPCF(std.p, std.c, std.f)) + ' kcal'; manualI.style.display = 'none'; }
+        if (std) {
+          var qty = parseQty(wI.value, std.name);
+          var k = std.kcal * qty / 100;
+          autoBox.textContent = '匹配「' + std.name + '」每100g ' + std.kcal + ' kcal（P' + std.p + ' C' + std.c + ' F' + std.f + '）' + (qty ? ' · 约 ' + round(k) + ' kcal' : '');
+          manualI.style.display = 'none';
+        }
         else { autoBox.textContent = '未在表中，请在下方手动填热量（或去「基础信息」核对）'; manualI.style.display = ''; }
       }
       var addBtn = U.el('button', { class: 'btn', style: 'margin-top:10px', text: '添加这道食材', onclick: addSingle });
       function addSingle() {
         var n = nameI.value.trim(); if (!n) { U.toast('请输入食材名'); return; }
-        var w = parseFloat(wI.value) || 0; if (!w) { U.toast('请输入重量'); return; }
         var std = resolve(n);
-        var p, c, f, k, manual = false;
-        if (std) { p = std.p * w / 100; c = std.c * w / 100; f = std.f * w / 100; k = kcalPCF(p, c, f); }
-        else { var mk = parseFloat(manualI.value); if (!mk) { U.toast('该食材不在表中，请填热量'); return; } k = mk; p = c = f = 0; manual = true; }
-        pushDiet({ name: n + ' ' + round(w) + 'g', w: w, p: round(p), c: round(c), f: round(f), kcal: round(k), manual: manual, meal: meal });
-        nameI.value = ''; wI.value = ''; manualI.value = ''; autoBox.textContent = ''; U.toast('已记录'); render();
+        var p, c, f, k, w, manual = false;
+        if (std) {
+          w = parseQty(wI.value, std.name); if (!w) { U.toast('请输入重量或数量'); return; }
+          p = std.p * w / 100; c = std.c * w / 100; f = std.f * w / 100; k = std.kcal * w / 100;
+        }
+        else { var mk = parseFloat(manualI.value); if (!mk) { U.toast('该食材不在表中，请填热量'); return; } k = mk; p = c = f = 0; w = 0; manual = true; }
+        pushDiet({ name: n + (w ? ' ' + round(w) + 'g' : ''), w: w, p: round(p), c: round(c), f: round(f), kcal: round(k), manual: manual, meal: meal });
+        nameI.value = ''; wI.value = ''; manualI.value = ''; autoBox.textContent = ''; U.toast('已记录 ' + round(k) + ' kcal'); render();
       }
       sCard.appendChild(nameI); sCard.appendChild(wI); sCard.appendChild(autoBox); sCard.appendChild(manualI); sCard.appendChild(addBtn);
       wrap.appendChild(sCard);
@@ -291,13 +326,13 @@
       dCard.appendChild(U.el('div', { class: 'card-sub', text: '② 家常菜拆分录入（每种原料分别称重）' }));
       var dishNameI = U.el('input', { class: 'input', placeholder: '菜名（如 黄瓜炒鸡蛋）', style: 'margin-top:6px' });
       var splitsBox = U.el('div', { style: 'margin-top:8px' });
-      var splits = [{ name: '黄瓜', w: 150 }, { name: '鸡蛋', w: 100 }, { name: '食用油', w: 10 }];
+      var splits = [{ name: '黄瓜', w: '150' }, { name: '鸡蛋', w: '100' }, { name: '食用油', w: '10' }];
       function renderSplits() {
         U.clear(splitsBox);
         splits.forEach(function (s, idx) {
           var row = U.el('div', { class: 'row', style: 'gap:6px;margin:6px 0;align-items:center' });
           var ni = U.el('input', { class: 'input', placeholder: '原料', value: s.name }); ni.oninput = function () { s.name = ni.value; recalcDish(); };
-          var wi = U.el('input', { class: 'input', type: 'number', placeholder: 'g', value: s.w }); wi.oninput = function () { s.w = parseFloat(wi.value) || 0; recalcDish(); };
+          var wi = U.el('input', { class: 'input', placeholder: 'g / 1个 / 1勺', value: s.w }); wi.oninput = function () { s.w = wi.value; recalcDish(); };
           row.appendChild(ni); row.appendChild(wi); splitsBox.appendChild(row);
         });
       }
@@ -306,15 +341,15 @@
       var totBox = U.el('div', { class: 'muted', style: 'margin-top:8px' });
       function recalcDish() {
         var p = 0, c = 0, f = 0, kf = 0, unknown = false;
-        splits.forEach(function (s) { var std = resolve(s.name); var w = s.w || 0; if (std) { var pp = std.p * w / 100, cc = std.c * w / 100, ff = std.f * w / 100; p += pp; c += cc; f += ff; kf += kcalPCF(pp, cc, ff); } else if (w) unknown = true; });
+        splits.forEach(function (s) { var std = resolve(s.name); var w = parseQty(s.w, std ? std.name : ''); if (std) { var pp = std.p * w / 100, cc = std.c * w / 100, ff = std.f * w / 100; p += pp; c += cc; f += ff; kf += std.kcal * w / 100; } else if (w) unknown = true; });
         var oilCut = parseFloat(oilCutI.value) || 0;
-        totBox.textContent = '合计 ' + round(kf - oilCut) + ' kcal（蛋白 ' + round(p) + ' / 脂肪 ' + round(f) + '）' + (unknown ? ' · 含未收录原料，请填总热量' : '');
+        totBox.textContent = '合计 ' + round(kf - oilCut) + ' kcal（蛋白 ' + round(p) + ' / 碳水 ' + round(c) + ' / 脂肪 ' + round(f) + '）' + (unknown ? ' · 含未收录原料，请填总热量' : '');
       }
       oilCutI.oninput = recalcDish; manualTotalI.oninput = recalcDish;
       var addSplitBtn = U.el('button', { class: 'btn ghost sm', style: 'margin-top:8px', text: '＋ 加一行原料', onclick: function () { splits.push({ name: '', w: 0 }); renderSplits(); recalcDish(); } });
       var saveDishBtn = U.el('button', { class: 'btn', style: 'margin-top:10px', text: '保存这道菜到当前餐次', onclick: function () {
         var p = 0, c = 0, f = 0, kf = 0, unknown = false;
-        splits.forEach(function (s) { var std = resolve(s.name); var w = s.w || 0; if (std) { var pp = std.p * w / 100, cc = std.c * w / 100, ff = std.f * w / 100; p += pp; c += cc; f += ff; kf += kcalPCF(pp, cc, ff); } else if (w) unknown = true; });
+        splits.forEach(function (s) { var std = resolve(s.name); var w = parseQty(s.w, std ? std.name : ''); if (std) { var pp = std.p * w / 100, cc = std.c * w / 100, ff = std.f * w / 100; p += pp; c += cc; f += ff; kf += std.kcal * w / 100; } else if (w) unknown = true; });
         var oilCut = parseFloat(oilCutI.value) || 0;
         var total = kf - oilCut;
         if (unknown && !manualTotalI.value) { U.toast('含未收录原料，请填总热量'); return; }
@@ -365,6 +400,7 @@
       var right = U.el('div', { style: 'display:flex;align-items:center;gap:8px' });
       right.appendChild(U.el('span', { text: x.kcal + ' kcal' }));
       right.appendChild(U.el('button', { class: 'tag', text: '改', onclick: function () { editKcal(x); } }));
+      right.appendChild(U.el('button', { class: 'tag', style: 'color:var(--danger)', text: '删', onclick: function () { deleteDiet(x); } }));
       row.appendChild(right);
       return row;
     }
@@ -375,6 +411,12 @@
       body.appendChild(i);
       U.modal({ title: '修改热量（适配煎制吸油等误差）', body: body, actions: [{ label: '保存', primary: true, onClick: function () { var v = parseFloat(i.value); if (v >= 0) { x.kcal = round(v); x.manual = true; saveDiet(); U.toast('已更新'); render(); } } }, { label: '取消', onClick: function () {} }] });
     }
+    function deleteDiet(x) {
+      U.modal({ title: '确认删除', body: U.el('div', { text: '删除 ' + x.name + '（' + x.kcal + ' kcal）？' }), actions: [
+        { label: '删除', primary: true, onClick: function () { diet[today] = (diet[today] || []).filter(function (it) { return it.id !== x.id; }); saveDiet(); U.toast('已删除'); render(); } },
+        { label: '取消', onClick: function () {} }
+      ] });
+    }
 
     /* ===== ③ 运动消耗 ===== */
     function renderEx() {
@@ -382,14 +424,14 @@
       var card = U.el('div', { class: 'card' });
       card.appendChild(U.el('div', { class: 'card-sub', text: '运动消耗记录（MET 公式）' }));
       var sel = U.el('select', { class: 'input', style: 'margin-top:6px' });
-      Object.keys(D.METS).forEach(function (k) { sel.appendChild(U.el('option', { value: k, text: k + '（MET ' + D.METS[k] + '）' })); });
+      Object.keys(DB.METS).forEach(function (k) { sel.appendChild(U.el('option', { value: k, text: k + '（MET ' + DB.METS[k] + '）' })); });
       var minI = U.el('input', { class: 'input', type: 'number', value: 30, style: 'margin-top:6px' });
       var autoBox = U.el('div', { class: 'muted', style: 'margin-top:6px;font-size:12px' });
       var manualI = U.el('input', { class: 'input', type: 'number', placeholder: '或手动填消耗 kcal', style: 'margin-top:6px' });
-      function calcEx() { var k = round(D.METS[sel.value] * profile.curW * (parseFloat(minI.value) || 0) / 60); autoBox.textContent = '自动估算：MET ' + D.METS[sel.value] + ' × ' + profile.curW + 'kg × ' + (parseFloat(minI.value) || 0) + 'min = ' + k + ' kcal'; }
+      function calcEx() { var k = round(DB.METS[sel.value] * profile.curW * (parseFloat(minI.value) || 0) / 60); autoBox.textContent = '自动估算：MET ' + DB.METS[sel.value] + ' × ' + profile.curW + 'kg × ' + (parseFloat(minI.value) || 0) + 'min = ' + k + ' kcal'; }
       sel.onchange = calcEx; minI.oninput = calcEx; calcEx();
       var addBtn = U.el('button', { class: 'btn', style: 'margin-top:10px', text: '记录运动', onclick: function () {
-        var auto = round(D.METS[sel.value] * profile.curW * (parseFloat(minI.value) || 0) / 60);
+        var auto = round(DB.METS[sel.value] * profile.curW * (parseFloat(minI.value) || 0) / 60);
         var mk = parseFloat(manualI.value); var k = mk ? mk : auto; if (!(k > 0)) { U.toast('请填写时长或消耗'); return; }
         pushEx({ name: sel.value + ' ' + (parseFloat(minI.value) || 0) + 'min', min: parseFloat(minI.value) || 0, kcal: round(k), manual: !!mk });
         U.toast('已记录 ' + round(k) + ' kcal'); render();
