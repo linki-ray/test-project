@@ -84,7 +84,10 @@ body {
 }
 .brand-text { font-weight: 800; font-size: 16px; letter-spacing: .3px; color: var(--text); }
 
-.nav-menu { display: flex; flex-direction: column; gap: 5px; flex: 1; }
+.nav-menu { display: flex; flex-direction: column; gap: 5px; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.nav-menu::-webkit-scrollbar { width: 6px; }
+.nav-menu::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
+.nav-menu::-webkit-scrollbar-track { background: transparent; }
 .nav-item {
   display: flex; align-items: center; gap: 12px;
   padding: 10px 11px; border: none; background: transparent;
