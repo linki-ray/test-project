@@ -35,72 +35,72 @@ App.pages = App.pages || {};
   var catMap = {};
   CATS.forEach(function (g) { g.items.forEach(function (it) { catMap[it.id] = it.name; }); });
 
-  /* ---------- 食材热量库（每 100g kcal，估算参考值，源自公开营养资料） ---------- */
-  var FOOD_CAL = {
-    '鸡肉':133,'鸡胸':133,'鸡腿':120,'鸡翅':200,'鸡蛋':144,'蛋黄':352,'蛋白':52,'鸭蛋':180,
-    '猪肉':143,'五花肉':349,'里脊':155,'排骨':264,'猪蹄':260,'腊肉':181,'香肠':508,'培根':505,
-    '牛肉':250,'牛腩':332,'牛排':250,'羊肉':203,'羊排':294,
-    '鱼':100,'鲫鱼':108,'鲈鱼':105,'带鱼':127,'草鱼':112,'三文鱼':139,'鳕鱼':88,'虾':93,'虾仁':93,'蟹':95,'鱿鱼':92,'扇贝':60,'海参':78,'鲍鱼':84,'蛤':62,'花蛤':62,'蛏':59,'猪肝':129,'牛蛙':85,
-    '豆腐':81,'嫩豆腐':81,'老豆腐':98,'豆干':140,'香干':140,'腐竹':459,'千张':260,'豆芽':47,'黄豆芽':47,'绿豆芽':47,'毛豆':131,'蚕豆':335,'豌豆':105,
-    '皮蛋':171,'咸蛋':190,'鹌鹑蛋':160,
-    '生菜':15,'油麦菜':15,'上海青':15,'菜心':20,'白菜':18,'小白菜':15,'菠菜':23,'空心菜':20,'茼蒿':21,'芥兰':25,'芹菜':14,'香菜':27,'韭菜':26,'油菜':20,'娃娃菜':14,'包菜':22,'卷心菜':22,'西兰花':34,'花菜':25,'菜花':25,'番茄':18,'西红柿':18,'黄瓜':15,'冬瓜':10,'南瓜':26,'丝瓜':20,'苦瓜':19,'茄子':25,'青椒':20,'彩椒':26,'辣椒':40,'小米辣':40,'洋葱':40,'胡萝卜':39,'白萝卜':16,'萝卜':16,'土豆':77,'红薯':86,'紫薯':86,'山药':57,'莲藕':74,'莴笋':15,'芦笋':20,'秋葵':37,'竹笋':27,'冬笋':27,'香菇':26,'平菇':24,'金针菇':32,'杏鲍菇':31,'木耳':27,'银耳':36,'海带':13,'紫菜':35,'西葫芦':17,'荷兰豆':30,'四季豆':31,'豇豆':31,'玉米':86,'青豆':86,'毛豆':131,
-    '米饭':116,'大米':346,'面条':138,'面粉':344,'馒头':221,'面包':265,'吐司':265,'粉丝':338,'粉条':338,'年糕':154,'糯米':350,'饺子皮':280,
-    '食用油':884,'橄榄油':884,'玉米油':884,'花生油':884,'葵花籽油':884,'香油':884,'芝麻油':884,'黄油':717,'猪油':897,
-    '盐':0,'生抽':63,'老抽':71,'酱油':63,'蚝油':110,'醋':31,'米醋':31,'香醋':31,'白醋':31,'糖':400,'白糖':400,'冰糖':397,'蜂蜜':304,'料酒':114,'黄酒':100,'白酒':298,'豆瓣酱':200,'甜面酱':220,'番茄酱':82,'沙拉酱':380,'花生酱':594,'芝麻酱':618,'咖喱':210,'淀粉':350,'生粉':350,
-    '牛奶':54,'纯牛奶':54,'酸奶':72,'芝士':328,'奶酪':328,'淡奶油':346,'炼乳':331,'巧克力':546,'可可粉':320,'咖啡':2,'花生':567,'核桃':654,'杏仁':579,'腰果':553,'瓜子':608,'坚果':600
-  };
-  // 扩充常见食物（权威公开营养参考值，每 100g kcal）——覆盖水果/坚果/主食/熟食/肉禽/酒饮等，提升自选菜品自动估算准确度
-  var FOOD_CAL_EXTRA = {
-    '燕麦':389,'小米':361,'荞麦':337,'藜麦':368,'芋头':79,'板栗':185,'魔芋':10,'凉皮':110,'烧麦':220,'包子':220,'馄饨':250,'汤圆':310,'披萨':266,'汉堡':292,'寿司':150,'鸭肉':240,'鹅肉':290,'鸽子':220,'午餐肉':220,'火腿':330,'鸡爪':215,'墨鱼':82,'蚬':47,'蛏子':59,
-    '葡萄':43,'苹果':52,'香蕉':89,'梨':50,'橙子':47,'柚子':42,'草莓':32,'蓝莓':57,'西瓜':30,'哈密瓜':34,'桃子':39,'樱桃':46,'荔枝':66,'芒果':60,'菠萝':50,'猕猴桃':61,'火龙果':60,'榴莲':147,'椰子':241,'木瓜':30,'杏':36,'杨梅':30,'桑葚':36,
-    '巴旦木':579,'碧根果':692,'松子':698,'榛子':628,'夏威夷果':718,'开心果':562,'南瓜子':582,'亚麻籽':534,'黑芝麻':559,'白芝麻':517,
-    '蛋糕':348,'甜甜圈':452,'饼干':433,'曲奇':502,'奶茶':70,'珍珠奶茶':90,'可乐':43,'雪碧':41,'橙汁':45,'啤酒':43,'红酒':85,'威士忌':250,
-    '糙米':368,'黑米':341,'红米':359,'薏米':357,'红豆':324,'绿豆':316,'黑豆':341,'芸豆':333,'鹰嘴豆':364,'扁豆':339,
-    '煎饼':333,'手抓饼':350,'葱油饼':350,'油条':388,'麻花':524,'桃酥':480,'月饼':430,'粽子':278,
-    '米粉':350,'米线':350,'螺蛳粉':350,'热干面':200,'炸酱面':250,'炒饭':220,'盖浇饭':300,'沙拉':80,'三明治':250,'比萨':266
-  };
-  Object.assign(FOOD_CAL, FOOD_CAL_EXTRA);
-  // 计数单位默认单重（克/个）——用于「1个/根/瓣」等无质量单位
-  var PER_UNIT = {
-    '鸡蛋':50,'番茄':150,'西红柿':150,'土豆':150,'黄瓜':200,'洋葱':150,'青椒':100,'茄子':200,
-    '冬瓜':500,'南瓜':400,'胡萝卜':150,'白萝卜':400,'红薯':200,'山药':150,'莲藕':150,'西葫芦':200,
-    '玉米':150,'蒜':5,'大蒜':5,'姜':20,'葱':30,'香菜':10,'柠檬':50,'橙':150,
-    '香菇':15,'平菇':20,'木耳':5,'红枣':8,'枸杞':2,'虾仁':15,'虾':20,'鱼':300,'豆腐':300,'香干':50,
-    '西兰花':150,'白菜':300,'包菜':300,'生菜':200,'油麦菜':200,'娃娃菜':200,'皮蛋':60,'咸蛋':60,'鹌鹑蛋':10
-  };
-  var UNIT_G = { '克':1,'g':1,'G':1,'千克':1000,'kg':1000,'公斤':1000,'斤':500,'两':50,'ml':1,'毫升':1,'升':1000,'l':1000 };
-  var VAGUE = { '少许':3,'少量':5,'适量':10,'若干':5,'一点':3,'一点点':2,'几滴':2,'半勺':2.5,'1勺':5,'一勺':5,'1大勺':15,'一大勺':15,'小勺':3,'半碗':100 };
+  /* ---------- 统一食物库（food-data.js，来源《中国食物成分表》官方平台） ---------- */
+  var DB = window.FOOD_DB || { FOODS: {}, ALIASES: {}, PER_UNIT: {} };
+  var FOODS = DB.FOODS, ALIASES = DB.ALIASES, PER_UNIT = DB.PER_UNIT;
+  // 模糊量词 → 克（少许/适量等；勺类走下方精确分支，避免"1勺油"被当成5g）
+  var VAGUE = { '少许': 3, '少量': 5, '适量': 10, '若干': 5, '一点': 3, '一点点': 2, '几滴': 2, '半勺': 2.5, '半碗': 100 };
+  var UNIT_G = { '克': 1, 'g': 1, 'G': 1, '千克': 1000, 'kg': 1000, '公斤': 1000, '斤': 500, '两': 50, 'ml': 1, '毫升': 1, '升': 1000, 'l': 1000 };
 
-  function calPer100(name) {
-    var best = null, bestLen = 0;
-    for (var k in FOOD_CAL) { if (name.indexOf(k) > -1 && k.length > bestLen) { best = FOOD_CAL[k]; bestLen = k.length; } }
-    return best; // 每百克 kcal，无则返回 undefined
+  // 解析食材名 → 标准食物（最长子串匹配：先 FOODS 标准名，后 ALIASES 别名）
+  function resolveFood(s) {
+    var best = null, bestLen = 0, k, a;
+    for (k in FOODS) { if (s.indexOf(k) > -1 && k.length > bestLen) { best = k; bestLen = k.length; } }
+    for (a in ALIASES) { if (s.indexOf(a) > -1 && a.length > bestLen) { best = ALIASES[a]; bestLen = a.length; } }
+    return best ? FOODS[best] ? { name: best, data: FOODS[best] } : null : null;
   }
-  function parseGrams(ing) {
-    var s = ing || '';
-    for (var vk in VAGUE) { if (s.indexOf(vk) > -1) return { g: VAGUE[vk], vague: true }; }
-    var m = s.match(/(\d+(?:\.\d+)?)\s*(克|g|G|千克|kg|公斤|斤|两|ml|毫升|升|l)/);
-    if (m) { var num = parseFloat(m[1]); return { g: num * (UNIT_G[m[2]] || 1), vague: false }; }
+
+  // 解析用量 → 克（优先级：明确克重 > 勺 > 模糊量词 > 计数单位）
+  function parseGrams(s, canonical) {
+    var m = s.match(/(\d+(?:\.\d+)?)\s*(克|g|G|千克|kg|公斤|斤|两|ml|毫升|升|l|lb|LB)/);
+    if (m) { var n = parseFloat(m[1]); return { g: n * (UNIT_G[m[2]] || 1), vague: false }; }
+    var sm = s.match(/(\d+(?:\.\d+)?)\s*(勺|汤匙|茶匙|大勺)/);
+    if (sm) {
+      var sn = parseFloat(sm[1]), per = 10; // 用户规则：1勺液体≈10g
+      if (/油/.test(s)) per = 10;
+      else if (/糖/.test(s)) per = 8;
+      else if (/淀粉|生粉/.test(s)) per = 8;
+      return { g: sn * per, vague: false };
+    }
+    var vk; for (vk in VAGUE) { if (s.indexOf(vk) > -1) return { g: VAGUE[vk], vague: true }; }
     var cm = s.match(/(\d+(?:\.\d+)?)\s*(个|颗|根|瓣|只|条|块|片|把|段|粒|张|枚|朵|穗)/);
     if (cm) {
-      var n2 = parseFloat(cm[1]); var per = 0;
-      for (var pk in PER_UNIT) { if (s.indexOf(pk) > -1) { per = PER_UNIT[pk]; break; } }
-      return { g: per ? n2 * per : 0, vague: per ? false : true };
+      var cn = parseFloat(cm[1]), pu = PER_UNIT[canonical] || 0;
+      return { g: pu ? cn * pu : 0, vague: pu ? false : true };
     }
     if (/盐/.test(s)) return { g: 2, vague: true };
     if (/水|清水/.test(s)) return { g: 0, vague: true };
     return { g: 0, vague: true };
   }
+
+  // 焯水/白灼/清蒸/煮汤类：煮水里的姜葱不计入摄入（料酒本身 kcal=0 已处理）
+  function isPoachDish(d) {
+    var t = (d.name || '') + ' ' + (d.steps || []).join(' ') + ' ' + (d.text || '');
+    return /白切|白灼|清蒸|水煮|浸煮|焯|温拌|汤|煲|炖/.test(t);
+  }
+
   function dishCalories(d) {
-    var total = 0, details = [], unmatched = [];
+    var total = 0, details = [], unmatched = [], sumRaw = 0;
+    var poach = isPoachDish(d);
     (d.ingredients || []).forEach(function (ing) {
-      var cal = calPer100(ing); var gm = parseGrams(ing);
-      if (cal != null && gm.g > 0) {
-        var kcal = Math.round(cal * gm.g / 100); total += kcal;
-        details.push({ ing: ing, g: Math.round(gm.g), kcal: kcal, vague: gm.vague });
-      } else { unmatched.push(ing); }
+      var r = resolveFood(ing);
+      if (!r) { unmatched.push(ing); return; }
+      var gm = parseGrams(ing, r.name);
+      if (gm.g <= 0) { unmatched.push(ing); return; }
+      // 焯水类：煮水里的姜/葱丢弃（料酒 kcal=0 已由系数处理）
+      if (poach && (r.name === '姜' || r.name === '葱')) { unmatched.push(ing + '（煮水丢弃）'); return; }
+      var edible = (r.data.edible || 1);
+      var kcal = Math.round(r.data.kcal * gm.g / 100 * edible);
+      total += kcal; sumRaw += gm.g;
+      details.push({ ing: ing, g: Math.round(gm.g * edible), kcal: kcal, vague: gm.vague });
     });
-    return { total: total, details: details, unmatched: unmatched };
+    // 烘焙类：额外给出「每100g」口径（用户规则：烘焙按100g计，不是按1整个）
+    var per100g = 0;
+    if (d.cats && d.cats.indexOf('baking') > -1 && sumRaw > 0) {
+      var estWeight = sumRaw * 0.85; // 烘焙成品约 = 原料总重 × 0.85
+      per100g = Math.round(total / (estWeight / 100));
+    }
+    return { total: total, details: details, unmatched: unmatched, per100g: per100g };
   }
 
   /* 菜谱数据来自 菜单/*.docx 提取（scripts/gen_recipes.py 生成 recipes-extra.js），真实菜名/食材/做法 */
@@ -373,7 +373,7 @@ App.pages = App.pages || {};
         var info = U.el('div', { class: 'dish-info' });
         info.appendChild(U.el('div', { class: 'dish-name', text: d.name }));
         var cal = dishCalories(d);
-        if (cal.total > 0) info.appendChild(U.el('div', { class: 'dish-cal', text: '约 ' + cal.total + ' kcal' }));
+        if (cal.total > 0) info.appendChild(U.el('div', { class: 'dish-cal', text: (cal.per100g > 0 ? '≈ ' + cal.per100g + ' kcal/100g' : '约 ' + cal.total + ' kcal') }));
         var tags = U.el('div', { class: 'dish-tags' });
         dishTags(d).slice(0, 3).forEach(function (t) { tags.appendChild(U.el('span', { class: 'tag xs', text: t })); });
         info.appendChild(tags);
@@ -410,7 +410,7 @@ App.pages = App.pages || {};
           row.appendChild(U.el('span', { class: 'muted', text: det ? (det.g + 'g · ' + det.kcal + ' kcal') : '—' }));
           methodBox.appendChild(row);
         });
-        methodBox.appendChild(U.el('div', { style: 'font-weight:700;margin-top:6px', text: '整道菜约 ' + cal.total + ' kcal（整份·估算）' }));
+        methodBox.appendChild(U.el('div', { style: 'font-weight:700;margin-top:6px', text: '整道菜约 ' + cal.total + ' kcal（整份·估算）' + (cal.per100g > 0 ? ' · ≈' + cal.per100g + ' kcal/100g' : '') }));
         if (cal.unmatched.length) methodBox.appendChild(U.el('div', { class: 'muted', style: 'font-size:12px;margin-top:2px', text: '（“' + cal.unmatched.join('、') + '”无热量数据，未计入）' }));
       }
       if (d.steps && d.steps.length) {
