@@ -8,7 +8,7 @@
 
   var TITLES = {
     'daily-plan': '每日计划', 'viral-videos': '爆款抖音小红书视频',
-    'inspiration': '灵感记录', 'finance': '全球金融热点', 'checkin': '打卡计划',
+    'inspiration': '灵感记录', 'finance': '全球金融热点',
     'vv-analyzer': '视频智能解析', 'vv-library': '爆款素材库', 'vv-creation': '爆款二创', 'reading': '阅读读书',
     'recipes': '今日菜谱', 'burn': '燃烧卡路里', 'daily-advice': '今日参谋'
   };
@@ -100,14 +100,6 @@
       notified[vidKey] = true;
       App._videoAutoCollect();
     }
-    // 4) 自定义打卡提醒
-    var c = S.getCheckins();
-    (c.custom || []).forEach(function (it) {
-      if (it.remind) {
-        var k = 'cu_' + it.id + '_' + S.todayStr();
-        if (it.remind === hhmm && !notified[k]) { notified[k] = true; U.notify('打卡提醒', '「' + it.name + '」到时间啦！', { warn: true }); }
-      }
-    });
   }
 
   /* ---------- 存储设置 ---------- */

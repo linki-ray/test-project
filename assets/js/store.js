@@ -128,18 +128,6 @@ App.Store = (function () {
   function getFinQueryHistory() { return get('fin_query_hist', []); }
   function setFinQueryHistory(a) { set('fin_query_hist', a); }
 
-  /* ---- 打卡计划 ---- */
-  function getCheckins() {
-    var c = get('checkin');
-    if (!c) { c = { reading: [], pdd: [], custom: [] }; set('checkin', c); }
-    // 确保子结构存在
-    if (!c.reading) c.reading = [];
-    if (!c.pdd) c.pdd = [];
-    if (!c.custom) c.custom = [];
-    return c;
-  }
-  function saveCheckins(c) { set('checkin', c); }
-
   /* ---- 标签 ---- */
   function getTags(bucket) { return get('tags_' + bucket, []); }
   function saveTags(bucket, arr) { set('tags_' + bucket, arr); }
@@ -195,7 +183,7 @@ App.Store = (function () {
 
   /* 存储统计 */
   function stats() {
-    var keys = ['dp', 'dp_hist', 'videos', 'insp', 'fin_news', 'fin_screen', 'fin_query_hist', 'checkin'];
+    var keys = ['dp', 'dp_hist', 'videos', 'insp', 'fin_news', 'fin_screen', 'fin_query_hist'];
     var total = 0;
     keys.forEach(function (k) { var v = localStorage.getItem(PREFIX + k); if (v) total += v.length; });
     return { mode: getMode(), bytes: total, kb: (total / 1024).toFixed(1) };
@@ -210,7 +198,6 @@ App.Store = (function () {
     getInspirations: getInspirations, saveInspirations: saveInspirations, getDraft: getDraft, setDraft: setDraft,
     getFinNews: getFinNews, setFinNews: setFinNews, getFinScreen: getFinScreen, setFinScreen: setFinScreen,
     getFinQueryHistory: getFinQueryHistory, setFinQueryHistory: setFinQueryHistory,
-    getCheckins: getCheckins, saveCheckins: saveCheckins,
     getTags: getTags, saveTags: saveTags,
     ensureDailyReset: ensureDailyReset, forceReset: forceReset, stats: stats
   };
