@@ -442,8 +442,10 @@ App.pages = App.pages || {};
       U.el('span', { class: 'src-tag', id: 'pmSrc' }),
       U.el('button', { class: 'btn ghost xs', style: 'float:right;margin-top:-2px', text: '🔄 刷新', onclick: function () { loadPreNews(true); } })
     ]));
-    var policyBox = U.el('div'); var annBox = U.el('div');
-    newsCard.appendChild(U.el('div', { class: 'card-sub', text: '📋 政策 / 宏观' }));
+    var aBox = U.el('div'); var policyBox = U.el('div'); var annBox = U.el('div');
+    newsCard.appendChild(U.el('div', { class: 'card-sub', text: '📈 A股 快讯' }));
+    newsCard.appendChild(aBox);
+    newsCard.appendChild(U.el('div', { class: 'card-sub', style: 'margin-top:8px', text: '📋 政策 / 宏观' }));
     newsCard.appendChild(policyBox);
     newsCard.appendChild(U.el('div', { class: 'card-sub', style: 'margin-top:8px', text: '🏢 公司公告 / 快讯' }));
     newsCard.appendChild(annBox);
@@ -464,19 +466,37 @@ App.pages = App.pages || {};
       });
       ovBox.appendChild(grid);
     }
+    // 英文占比过高（海外英文新闻）→ 不录入，用户看不懂
+    function isEnglishNews(t) {
+      if (!t) return false;
+      var latin = (t.match(/[A-Za-z]/g) || []).length;
+      var cjk = (t.match(/[一-鿿]/g) || []).length;
+      if (cjk === 0) return latin > 3;          // 纯英文（无汉字）一律视为英文新闻
+      return latin / (latin + cjk) > 0.6;       // 英文占比超 60% 视为英文新闻
+    }
+    // A股 / 个股 相关关键词（优先置顶）
+    var A_RE = /A股|沪深|沪指|深成指|深证|上证|创业板|科创板|北证|北交|主板|个股|涨停|跌停|龙虎榜|主力资金|北向资金|融资融券|融券|中证|沪深300|打新|IPO|减持|增持|回购|预增|预亏|业绩|分红|送转|高送转|机构调研|游资|妖股|连板|大盘|题材|板块/;
+    var POLICY_RE = /政策|央行|国务院|发改委|财政|货币|降准|降息|两会|会议|发文|印发|监管|证监会|交易所|统计局|PMI|GDP|CPI|社融|信贷|宏观/;
     function showPreNews(items) {
-      U.clear(policyBox); U.clear(annBox);
-      if (!items || !items.length) { policyBox.appendChild(U.el('div', { class: 'empty', text: '暂无' })); return; }
-      items.slice(0, 14).forEach(function (n) {
-        var isPolicy = /政策|央行|国务院|发改委|财政|货币|降准|降息|两会|会议|发文|印发|监管|证监会|交易所/.test(n.title);
-        var box = isPolicy ? policyBox : annBox;
+      U.clear(aBox); U.clear(policyBox); U.clear(annBox);
+      if (!items || !items.length) { aBox.appendChild(U.el('div', { class: 'empty', text: '暂无' })); return; }
+      var shown = 0, MAX = 18;
+      items.forEach(function (n) {
+        if (shown >= MAX) return;
+        if (isEnglishNews(n.title)) return;                 // 英文海外新闻不录入
+        var isA = A_RE.test(n.title);
+        var isPolicy = !isA && POLICY_RE.test(n.title);
+        var box = isA ? aBox : (isPolicy ? policyBox : annBox);
         var r = U.el('div', { class: 'quote-row' });
         r.appendChild(U.el('div', {}, [
           U.el('div', { style: 'cursor:pointer;font-size:13px', text: n.title, onclick: function () { if (n.url) window.open(n.url, '_blank'); } }),
           U.el('div', { class: 'muted', text: n.time })
         ]));
-        box.appendChild(r);
+        box.appendChild(r); shown++;
       });
+      if (!aBox.childNodes.length) aBox.appendChild(U.el('div', { class: 'empty', text: '暂无 A股相关' }));
+      if (!policyBox.childNodes.length) policyBox.appendChild(U.el('div', { class: 'empty', text: '暂无' }));
+      if (!annBox.childNodes.length) annBox.appendChild(U.el('div', { class: 'empty', text: '暂无' }));
     }
     function loadOverview(manual) {
       if (manual) U.$('#ovSrc').innerHTML = '<span class="live-dot wait"></span> 刷新中…';
