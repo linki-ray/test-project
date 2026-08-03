@@ -443,7 +443,6 @@ App.pages = App.pages || {};
       var arr = getPreselect();
       if (!arr.length) { U.toast('请先预选至少一道菜'); return; }
       var dishes = arr.map(findDish).filter(Boolean);
-      var personCount = 2;
       var groups = [['meat', '🍖 肉菜'], ['veg', '🥬 青菜'], ['soup', '🍲 汤'], ['other', '📎 其他']];
       var body = U.el('div');
       var actions = U.el('div', { class: 'row', style: 'margin-bottom:10px' });

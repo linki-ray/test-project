@@ -137,7 +137,7 @@
       wCard.appendChild(U.el('div', { style: 'font-size:15px;margin-top:4px', text: wToday ? (wToday + ' kg') : '未记录（去「基础信息」记录）' }));
       wrap.appendChild(wCard);
 
-      wrap.appendChild(listCard('当日饮食清单', dArr.map(function (x) { return x.meal + ' · ' + x.name + ' · ' + x.kcal + ' kcal'; })));
+      wrap.appendChild(listCard('当日饮食清单', dArr.map(function (x) { return (x.meal || '未分餐') + ' · ' + x.name + ' · ' + x.kcal + ' kcal'; })));
       wrap.appendChild(listCard('当日运动清单', eArr.map(function (x) { return x.name + ' · ' + x.kcal + ' kcal'; })));
       return wrap;
     }
@@ -280,7 +280,7 @@
         var p, c, f, k, manual = false;
         if (std) { p = std.p * w / 100; c = std.c * w / 100; f = std.f * w / 100; k = kcalPCF(p, c, f); }
         else { var mk = parseFloat(manualI.value); if (!mk) { U.toast('该食材不在表中，请填热量'); return; } k = mk; p = c = f = 0; manual = true; }
-        pushDiet({ name: n + ' ' + round(w) + 'g', w: w, p: round(p), c: round(c), f: round(f), kcal: round(k), manual: manual });
+        pushDiet({ name: n + ' ' + round(w) + 'g', w: w, p: round(p), c: round(c), f: round(f), kcal: round(k), manual: manual, meal: meal });
         nameI.value = ''; wI.value = ''; manualI.value = ''; autoBox.textContent = ''; U.toast('已记录'); render();
       }
       sCard.appendChild(nameI); sCard.appendChild(wI); sCard.appendChild(autoBox); sCard.appendChild(manualI); sCard.appendChild(addBtn);
@@ -320,14 +320,14 @@
         if (unknown && !manualTotalI.value) { U.toast('含未收录原料，请填总热量'); return; }
         if (manualTotalI.value) total = parseFloat(manualTotalI.value);
         if (!(total > 0)) { U.toast('热量为 0，请检查'); return; }
-        pushDiet({ name: (dishNameI.value.trim() || '自定义菜') + '（拆分）', w: 0, p: round(p), c: round(c), f: round(f), kcal: round(total), manual: !!manualTotalI.value, split: true });
+        pushDiet({ name: (dishNameI.value.trim() || '自定义菜') + '（拆分）', w: 0, p: round(p), c: round(c), f: round(f), kcal: round(total), manual: !!manualTotalI.value, split: true, meal: meal });
         U.toast('已记录 ' + round(total) + ' kcal'); render();
       } });
       renderSplits(); recalcDish();
       dCard.appendChild(dishNameI); dCard.appendChild(splitsBox); dCard.appendChild(addSplitBtn); dCard.appendChild(oilCutI); dCard.appendChild(manualTotalI); dCard.appendChild(totBox); dCard.appendChild(saveDishBtn);
       wrap.appendChild(dCard);
 
-      // 今日汇总
+      // 今日汇总（按餐次分组）
       var sumCard = U.el('div', { class: 'card' });
       sumCard.appendChild(U.el('div', { class: 'card-sub', text: '今日饮食汇总' }));
       var dArr = dayDiet(today);
@@ -337,16 +337,31 @@
       tot.appendChild(statCard('碳水', sumC(dArr), 'g'));
       tot.appendChild(statCard('脂肪', sumF(dArr), 'g'));
       sumCard.appendChild(tot);
-      dArr.forEach(function (x) { sumCard.appendChild(dietRow(x)); });
-      if (!dArr.length) sumCard.appendChild(U.el('div', { class: 'muted', text: '（暂无）' }));
+
+      var MEALS = ['早餐', '午餐', '晚餐', '加餐'];
+      var grouped = {};
+      MEALS.forEach(function (m) { grouped[m] = []; });
+      dArr.forEach(function (x) { var m = x.meal || '未分餐'; if (!grouped[m]) grouped[m] = []; grouped[m].push(x); });
+      var hasAny = false;
+      MEALS.concat(['未分餐']).forEach(function (m) {
+        var list = grouped[m];
+        if (!list || !list.length) return;
+        hasAny = true;
+        var sec = U.el('div', { style: 'margin-top:10px' });
+        sec.appendChild(U.el('div', { style: 'font-weight:700;font-size:14px;margin-bottom:4px', text: m + ' · ' + sumK(list) + ' kcal' }));
+        list.forEach(function (x) { sec.appendChild(dietRow(x, m === '未分餐')); });
+        sumCard.appendChild(sec);
+      });
+      if (!hasAny) sumCard.appendChild(U.el('div', { class: 'muted', text: '（暂无）' }));
       wrap.appendChild(sumCard);
       return wrap;
     }
 
-    function dietRow(x) {
+    function dietRow(x, forceMeal) {
       var row = U.el('div', { class: 'row', style: 'justify-content:space-between;align-items:center;padding:8px 0;border-bottom:0.5px solid var(--border-3);font-size:13px' });
       var sub = x.src === 'guide' ? '来自做菜指南 · 仅热量估算' : 'P' + x.p + ' C' + x.c + ' F' + x.f + (x.manual ? '（手动）' : '');
-      row.appendChild(U.el('div', {}, [U.el('div', { text: x.meal + ' · ' + x.name }), U.el('div', { class: 'muted', style: 'font-size:12px', text: sub })]));
+      var title = (forceMeal && x.meal ? x.meal + ' · ' : '') + x.name;
+      row.appendChild(U.el('div', {}, [U.el('div', { text: title }), U.el('div', { class: 'muted', style: 'font-size:12px', text: sub })]));
       var right = U.el('div', { style: 'display:flex;align-items:center;gap:8px' });
       right.appendChild(U.el('span', { text: x.kcal + ' kcal' }));
       right.appendChild(U.el('button', { class: 'tag', text: '改', onclick: function () { editKcal(x); } }));
@@ -405,7 +420,7 @@
         var d = dateI.value || today;
         var da = dayDiet(d), ea = dayEx(d);
         histBox.appendChild(U.el('div', { class: 'muted', text: d + ' · 摄入 ' + sumK(da) + ' / 运动 ' + sumK(ea) + ' kcal' }));
-        if (da.length) histBox.appendChild(listCard('饮食', da.map(function (x) { return x.meal + ' · ' + x.name + ' · ' + x.kcal; })));
+        if (da.length) histBox.appendChild(listCard('饮食', da.map(function (x) { return (x.meal || '未分餐') + ' · ' + x.name + ' · ' + x.kcal; })));
         if (ea.length) histBox.appendChild(listCard('运动', ea.map(function (x) { return x.name + ' · ' + x.kcal; })));
         if (!da.length && !ea.length) histBox.appendChild(U.el('div', { class: 'muted', text: '当天无记录' }));
       }
