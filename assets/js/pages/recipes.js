@@ -485,7 +485,7 @@ App.pages = App.pages || {};
 
       function addGuideToBurn() {
         var totalC = dishes.reduce(function (s, d) { return s + dishCalories(d).total; }, 0);
-        var per = Math.round(totalC / personCount);
+        var per = Math.round(totalC / 2); // 默认菜谱按 2 人份设计，录入热量为一人食
         if (!per || per <= 0) { U.toast('本餐暂无估算热量'); return; }
         var names = dishes.map(function (d) { return d.name; }).slice(0, 3).join('、') + (dishes.length > 3 ? '等' + dishes.length + '道菜' : '');
         var entry = { name: '做菜指南：' + names, kcal: per, p: 0, c: 0, f: 0, meal: targetMeal, src: 'guide', qty: 1 };
@@ -496,7 +496,9 @@ App.pages = App.pages || {};
         entry.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         data[today].push(entry);
         S.set(key, data);
-        U.toast('已将 ' + per + ' kcal 计入「' + (targetPerson === 'ray' ? 'RAY' : '狐狸') + '」的' + targetMeal);
+        S.set('burn_person', targetPerson); // 切到目标人，确保回 burn 页面能看到
+        if (guideModal && guideModal.close) guideModal.close();
+        U.toast('已将 ' + per + ' kcal 计入「' + (targetPerson === 'ray' ? 'RAY' : '狐狸') + '」的' + targetMeal + '（可在燃烧卡路里查看）');
       }
 
       groups.forEach(function (g) {
@@ -529,12 +531,13 @@ App.pages = App.pages || {};
       function renderNutri() {
         U.clear(nutriBox);
         var totalC = dishes.reduce(function (s, d) { return s + dishCalories(d).total; }, 0);
-        var per = Math.round(totalC / personCount);
+        var per = Math.round(totalC / 2); // 默认 2 人份基准的人均
+        var totalShow = per * personCount; // 当前实际就餐人数下的总量
         var recommend = 700; // 成人一餐建议人均（女600-男850间取中值）
         var card = U.el('div', { class: 'card', style: 'background:var(--surface-2)' });
         card.appendChild(U.el('div', { class: 'card-title', text: '📊 营养概览（估算）' }));
         var gridN = U.el('div', { class: 'grid c3', style: 'gap:8px' });
-        gridN.appendChild(statCard('本餐总量', totalC, 'kcal'));
+        gridN.appendChild(statCard('本餐总量', totalShow, 'kcal'));
         gridN.appendChild(statCard('人均热量', per, 'kcal/人'));
         gridN.appendChild(statCard('一餐建议', recommend, 'kcal/人'));
         card.appendChild(gridN);
@@ -550,7 +553,7 @@ App.pages = App.pages || {};
         nutriBox.appendChild(card);
       }
       renderNutri();
-      U.modal({ title: '今日做菜指南', body: body, actions: [{ label: '关闭', primary: true, onClick: function () {} }] });
+      var guideModal = U.modal({ title: '今日做菜指南', body: body, actions: [{ label: '关闭', primary: true, onClick: function () {} }] });
     }
 
     function buildGuideText(dishes) {
