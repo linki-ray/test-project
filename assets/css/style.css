@@ -385,6 +385,8 @@ body {
 .dish-cal b { color: var(--brand); }
 .nutri-ok { color: #1a9e54; background: rgba(26,158,84,.10); border: 1px solid rgba(26,158,84,.28); border-radius: 10px; padding: 9px 11px; }
 .nutri-warn { color: #c9631a; background: rgba(212,105,26,.10); border: 1px solid rgba(212,105,26,.28); border-radius: 10px; padding: 9px 11px; }
+.fav-star { color: var(--text-2); }
+.fav-star.active { color: #f5a623; background: rgba(245,166,35,.12); border-color: rgba(245,166,35,.45); }
 
 
 

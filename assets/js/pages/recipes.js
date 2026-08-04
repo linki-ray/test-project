@@ -119,6 +119,12 @@ App.pages = App.pages || {};
   function setImported(a) { S.set(IMPORT_KEY, a); }
   function getPreselect() { return S.get(PRESELECT_KEY, []); }
   function setPreselect(a) { S.set(PRESELECT_KEY, a); }
+  var FAV_KEY = 'recipes_favs';
+  function getFavs() { return S.get(FAV_KEY, []); }
+  function setFavs(a) { S.set(FAV_KEY, a); }
+  function isFav(id) { return getFavs().indexOf(id) > -1; }
+  function toggleFav(id) { var a = getFavs(); var i = a.indexOf(id); if (i > -1) { a.splice(i, 1); } else { a.push(id); } setFavs(a); return i < 0; }
+  function clearFavs() { setFavs([]); }
 
   function findDish(id) {
     var all = RECIPES.concat(getImported());
@@ -165,6 +171,7 @@ App.pages = App.pages || {};
     quick.appendChild(mkQuick('🍽 菜谱分类', 'sec-cats'));
     quick.appendChild(mkQuick('🎯 今日吃什么', 'sec-wheel'));
     quick.appendChild(mkQuick('📥 导入菜单', 'sec-import'));
+    quick.appendChild(mkQuick('⭐ 我的收藏', 'sec-fav'));
     root.appendChild(quick);
 
     /* ===== 菜谱分类 ===== */
@@ -324,8 +331,16 @@ App.pages = App.pages || {};
         preBox.appendChild(U.el('span', { class: 'tag removable', text: (d.type === 'meat' ? '🍖' : d.type === 'veg' ? '🥬' : '🍲') + d.name, onclick: function () { removePre(id); renderGlobalPre(); wheels.forEach(function (w) { w.renderPre(); }); refreshCounts(); } }));
       });
     }
-    var genBtn = U.el('button', { class: 'btn ghost sm', style: 'margin-top:10px', text: '📋 一键生成做菜指南', onclick: function () { generateGuide(); } });
-    wheelCard.appendChild(genBtn);
+    var guideRow = U.el('div', { class: 'row', style: 'margin-top:10px;gap:8px' });
+    guideRow.appendChild(U.el('button', { class: 'btn ghost sm', text: '📋 一键生成做菜指南', onclick: function () { generateGuide(); } }));
+    guideRow.appendChild(U.el('button', { class: 'btn danger sm', text: '🗑 一键清空预选', onclick: function () {
+      if (!getPreselect().length) { U.toast('预选为空'); return; }
+      U.modal({ title: '清空预选', body: '确定要清空当前预选清单吗？', actions: [
+        { label: '取消', onClick: function () {} },
+        { label: '清空', primary: true, onClick: function () { setPreselect([]); renderGlobalPre(); wheels.forEach(function (w) { w.renderPre(); }); refreshCounts(); U.toast('预选已清空'); } }
+      ] });
+    } }));
+    wheelCard.appendChild(guideRow);
     root.appendChild(wheelSection);
     renderGlobalPre();
 
@@ -348,6 +363,41 @@ App.pages = App.pages || {};
     var previewBox = U.el('div', { id: 'importPreview', style: 'margin-top:12px' });
     impCard.appendChild(previewBox);
     root.appendChild(impCard);
+
+    /* ===== 我的收藏 ===== */
+    var favCard = U.el('div', { class: 'card', id: 'sec-fav' });
+    favCard.appendChild(U.el('div', { class: 'card-title', text: '⭐ 我的收藏' }));
+    var favBar = U.el('div', { class: 'row', style: 'margin-bottom:10px' });
+    favBar.appendChild(U.el('button', { class: 'btn ghost sm', text: '🗑 一键清空收藏', onclick: function () {
+      if (!getFavs().length) { U.toast('收藏为空'); return; }
+      U.modal({ title: '清空收藏', body: '确定要清空所有收藏菜品吗？', actions: [
+        { label: '取消', onClick: function () {} },
+        { label: '清空', primary: true, onClick: function () { clearFavs(); renderFav(); U.toast('收藏已清空'); } }
+      ] });
+    } }));
+    favCard.appendChild(favBar);
+    var favGrid = U.el('div', { class: 'grid c4' });
+    favCard.appendChild(favGrid);
+    root.appendChild(favCard);
+    function renderFav() {
+      U.clear(favGrid);
+      var ids = getFavs();
+      if (!ids.length) { favGrid.appendChild(U.el('div', { class: 'empty', style: 'grid-column:1/-1', text: '还没有收藏菜品，点开任意菜品点 ☆ 收藏吧～' })); return; }
+      ids.forEach(function (id) {
+        var d = findDish(id); if (!d) return;
+        var card = U.el('div', { class: 'dish-card', onclick: function () { showDish(d); } });
+        var info = U.el('div', { class: 'dish-info' });
+        info.appendChild(U.el('div', { class: 'dish-name', text: d.name }));
+        var cal = dishCalories(d);
+        if (cal.total > 0) info.appendChild(U.el('div', { class: 'dish-cal', text: (cal.per100g > 0 ? '≈ ' + cal.per100g + ' kcal/100g' : '约 ' + cal.total + ' kcal') }));
+        var tags = U.el('div', { class: 'dish-tags' });
+        dishTags(d).slice(0, 3).forEach(function (t) { tags.appendChild(U.el('span', { class: 'tag xs', text: t })); });
+        info.appendChild(tags);
+        card.appendChild(info);
+        favGrid.appendChild(card);
+      });
+    }
+    renderFav();
 
     /* ---------- 渲染函数 ---------- */
     /* 做法直接来自文档数据集，不再联网获取 */
@@ -427,6 +477,7 @@ App.pages = App.pages || {};
         title: d.name, body: body,
         actions: [
           { label: '加入预选', primary: true, onClick: function () { if (addPreselect(d.id)) { U.toast('已加入预选'); } else { U.toast('已在预选中'); } renderGlobalPre(); wheels.forEach(function (w) { w.renderPre(); }); } },
+          { label: isFav(d.id) ? '★ 已收藏' : '☆ 收藏', onClick: function () { var on = toggleFav(d.id); U.toast(on ? '已收藏：' + d.name : '已取消收藏'); renderFav(); } },
           { label: '关闭', onClick: function () {} }
         ]
       });
