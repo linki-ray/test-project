@@ -35,6 +35,13 @@ App.pages = App.pages || {};
   var catMap = {};
   CATS.forEach(function (g) { g.items.forEach(function (it) { catMap[it.id] = it.name; }); });
 
+  /* 供转盘筛选用的「菜系」列表（不含「全部」，统一在前置选项里加） */
+  var CUISINES = [
+    { id: 'guangdong', name: '广东菜' }, { id: 'hunan', name: '湖南菜' },
+    { id: 'sichuan', name: '四川菜' }, { id: 'thai', name: '泰国菜' },
+    { id: 'western', name: '西式' }, { id: 'dongbei', name: '东北菜' }
+  ];
+
   /* ---------- 统一食物库（food-data.js，来源《中国食物成分表》官方平台） ---------- */
   var DB = window.FOOD_DB || { FOODS: {}, ALIASES: {}, PER_UNIT: {} };
   var FOODS = DB.FOODS, ALIASES = DB.ALIASES, PER_UNIT = DB.PER_UNIT;
@@ -201,7 +208,7 @@ App.pages = App.pages || {};
     /* ===== 今日吃什么 · 三个独立转盘 ===== */
     var wheelSection = U.el('div', { id: 'sec-wheel' });
     wheelSection.appendChild(U.el('div', { class: 'card-title', style: 'margin:14px 0 6px', text: '🎯 今日吃什么' }));
-    wheelSection.appendChild(U.el('div', { class: 'muted', style: 'margin-bottom:10px', text: '三个转盘分别转肉菜 / 青菜 / 汤，每个可多次多选预选；已被预选的菜不会再被抽到。最后一键生成做菜指南。' }));
+    wheelSection.appendChild(U.el('div', { class: 'muted', style: 'margin-bottom:10px', text: '三个转盘分别转肉菜 / 青菜 / 汤。每个转盘可选菜系（如「广东菜」只转该菜系），每盘默认 30 道菜，转出一道就从盘里剔除、不会被重复抽到（已预选的菜也不会再出现）。最后一键生成做菜指南。' }));
 
     var wheelCard = U.el('div', { class: 'card' });
     var preBox = U.el('div', { class: 'row wrap', id: 'preselectBox' });
@@ -209,15 +216,42 @@ App.pages = App.pages || {};
     function addPreselect(id) { var a = getPreselect(); if (a.indexOf(id) > -1) return false; a.push(id); setPreselect(a); return true; }
     function removePre(id) { setPreselect(getPreselect().filter(function (x) { return x !== id; })); }
 
-    // 通用转盘构造（当前批 K 道 + 刷新换批 + 预选补位；转动与扇区对齐）
+    // 通用转盘构造：每盘 30 道，菜系可选，每次转出后从盘中剔除永不重复
     function makeWheel(type, label, hue) {
-      var pool = RECIPES.filter(function (d) { return d.type === type; });
-      var K = pool.length ? Math.min(12, Math.max(6, pool.length)) : 0;
+      var WHEEL_SIZE = 240;          // 转盘画布尺寸（增大以容纳 30 道菜名）
+      var BATCH_SIZE = 30;           // 每盘候选菜数（30 道一转）
+      var selectedCat = 'all';       // 当前选中的菜系（'all' = 不限菜系）
+      var wheelUsed = {};            // 本转盘已转出的菜 id（无论是「预选此菜」还是仅查看都剔除）
+      function poolByCat() {
+        return RECIPES.filter(function (d) {
+          if (d.type !== type) return false;
+          if (selectedCat === 'all') return true;
+          return (d.cats || []).indexOf(selectedCat) > -1;
+        });
+      }
+      var pool = poolByCat();
       var sub = U.el('div', { style: 'border-top:1px solid var(--line);padding-top:12px;margin-top:12px' });
+      // 标题行 = 标题 + 菜系下拉（红框改造点）
+      var titleRow = U.el('div', { class: 'row', style: 'justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px' });
       var titleEl = U.el('div', { class: 'card-sub' });
-      sub.appendChild(titleEl);
+      titleRow.appendChild(titleEl);
+      var catSel = U.el('select', { class: 'input', style: 'max-width:140px;font-size:13px;padding:4px 8px' });
+      catSel.appendChild(U.el('option', { value: 'all', text: '全部菜系' }));
+      CUISINES.forEach(function (c) {
+        catSel.appendChild(U.el('option', { value: c.id, text: c.name }));
+      });
+      catSel.onchange = function () {
+        selectedCat = this.value;
+        wheelUsed = {};              // 换菜系后重置本盘的已抽集合
+        currentBatch = [];
+        pool = poolByCat();
+        pickBatch();
+        U.toast(label + '已切到' + (selectedCat === 'all' ? '全菜系' : catMap[selectedCat]));
+      };
+      titleRow.appendChild(catSel);
+      sub.appendChild(titleRow);
       var wrap = U.el('div', { style: 'display:flex;flex-direction:column;align-items:center;gap:10px' });
-      var box = U.el('div', { style: 'position:relative;width:200px;height:200px' });
+      var box = U.el('div', { style: 'position:relative;width:' + WHEEL_SIZE + 'px;height:' + WHEEL_SIZE + 'px' });
       wrap.appendChild(box);
       var resultBox = U.el('div', { style: 'min-height:18px;text-align:center' });
       wrap.appendChild(resultBox);
@@ -232,32 +266,57 @@ App.pages = App.pages || {};
       wheelCard.appendChild(sub);
 
       var rotG = null, wheelRot = 0, spinning = false, currentBatch = [];
+
       function sample(arr, n) {
         var a = arr.slice();
         for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
         return a.slice(0, n);
       }
-      function availAll() { var sel = getPreselect(); return pool.filter(function (d) { return sel.indexOf(d.id) < 0; }); }
+      // 可用集 = 池中所有菜 - 已预选 - 本盘已转过
+      function availAll() {
+        var sel = getPreselect();
+        return pool.filter(function (d) {
+          if (sel.indexOf(d.id) > -1) return false;
+          if (wheelUsed[d.id]) return false;
+          return true;
+        });
+      }
       function renderWheel() {
-        box.innerHTML = buildWheelSVG(currentBatch, hue);
+        box.innerHTML = buildWheelSVG(currentBatch, hue, WHEEL_SIZE);
         rotG = box.querySelector('.wheelRot');
-        if (rotG) { rotG.style.transformBox = 'view-box'; rotG.style.transformOrigin = '100px 100px'; rotG.style.transform = 'rotate(' + wheelRot + 'deg)'; }
+        if (rotG) { rotG.style.transformBox = 'view-box'; rotG.style.transformOrigin = (WHEEL_SIZE / 2) + 'px ' + (WHEEL_SIZE / 2) + 'px'; rotG.style.transform = 'rotate(' + wheelRot + 'deg)'; }
       }
       function updateTitle() {
-        titleEl.textContent = label + '（本批 ' + currentBatch.length + ' / 池 ' + pool.length + ' · 已抽 ' + countSelected(pool) + '）';
+        var curCat = selectedCat === 'all' ? '全菜系' : catMap[selectedCat];
+        titleEl.textContent = label + '（' + curCat + ' · 本批 ' + currentBatch.length + ' / 池 ' + pool.length + ' · 已抽 ' + Object.keys(wheelUsed).length + '）';
       }
-      function pickBatch(exclude) {
-        var a = availAll();
-        var ex = exclude || [];
-        var fresh = a.filter(function (d) { return ex.indexOf(d.id) < 0; });
-        var src = fresh.length >= K ? fresh : a;
-        currentBatch = sample(src, Math.min(K, src.length));
+      // 从可用集抽 n 个（不足则有多少抽多少），自动保本盘批数稳定在 BATCH_SIZE
+      function fillBatch() {
+        var need = BATCH_SIZE - currentBatch.length;
+        if (need <= 0) return;
+        var fresh = availAll().filter(function (d) {
+          for (var i = 0; i < currentBatch.length; i++) if (currentBatch[i].id === d.id) return false;
+          return true;
+        });
+        var added = sample(fresh, Math.min(need, fresh.length));
+        currentBatch = currentBatch.concat(added);
+      }
+      function pickBatch() {
+        wheelUsed = {};              // 首次加载或「换一批」重置已抽
+        currentBatch = [];
+        fillBatch();
         wheelRot = 0;
         renderWheel(); updateTitle();
       }
       function spin() {
         if (spinning) return;
-        if (!currentBatch.length) { U.toast(label + ' 暂无可选，点「换一批」'); return; }
+        // 池空了就不让转
+        if (pool.length === 0) { U.toast(label + ' 该菜系暂无菜品'); return; }
+        // 批里没有可转了 → 自动补位再试一次
+        if (!currentBatch.length) {
+          fillBatch();
+          if (!currentBatch.length) { U.toast(label + ' 没有未抽过的菜了，点「换一批」重置'); return; }
+        }
         spinning = true;
         var N = currentBatch.length, step = 360 / N, idx = Math.floor(Math.random() * N);
         var desired = (360 - (idx * step + step / 2)) % 360;
@@ -269,6 +328,11 @@ App.pages = App.pages || {};
         setTimeout(function () {
           spinning = false;
           var d = currentBatch[idx];
+          // 关键：把抽到的从批里剔掉，wheelUsed 标记，下次永远不重复
+          currentBatch.splice(idx, 1);
+          wheelUsed[d.id] = true;
+          // 自动补位（如果不是「预选此菜」也会补位，让用户能继续转到新菜）
+          fillBatch();
           U.clear(resultBox);
           var line = U.el('div', { style: 'font-weight:800;font-size:16px' });
           line.appendChild(U.el('span', { text: '转到：' }));
@@ -276,17 +340,15 @@ App.pages = App.pages || {};
           resultBox.appendChild(line);
           resultBox.appendChild(U.el('button', { class: 'btn sm', style: 'margin-top:6px', text: '✓ 预选此菜', onclick: function () {
             if (addPreselect(d.id)) { U.toast('已预选：' + d.name); } else { U.toast('已在预选中'); }
-            var cur = currentBatch.filter(function (x) { return x.id !== d.id; });
-            var more = availAll().filter(function (x) { return cur.indexOf(x) < 0 && currentBatch.indexOf(x) < 0; });
-            currentBatch = cur.concat(sample(more, 1));
             renderWheel(); updateTitle();
             renderGlobalPre(); refreshCounts();
           } }));
+          resultBox.appendChild(U.el('div', { class: 'muted', style: 'font-size:12px;margin-top:4px', text: '已转 ' + Object.keys(wheelUsed).length + ' 道 / 池中共 ' + pool.length + ' 道' }));
+          renderWheel();
         }, 4100);
       }
       function refresh() {
-        var cur = currentBatch.map(function (d) { return d.id; });
-        pickBatch(cur);
+        pickBatch();
         U.toast(label + ' 已换新一批');
       }
       function renderPre() {
@@ -304,7 +366,7 @@ App.pages = App.pages || {};
       }
       renderPre();
       pickBatch();
-      return { pool: pool, renderPre: renderPre };
+      return { pool: function () { return pool; }, renderPre: renderPre };
     }
     function countSelected(pool) { var sel = getPreselect(); return pool.filter(function (d) { return sel.indexOf(d.id) > -1; }).length; }
     var wheels = [
@@ -747,7 +809,7 @@ App.pages = App.pages || {};
     }
   };
 
-  /* ---------- 转盘 SVG 构建（接收菜品池） ---------- */
+  /* ---------- 转盘 SVG 构建（接收菜品池 + 色相 + 画布尺寸，默认 200） ---------- */
   function polar(cx, cy, r, deg) {
     var a = (deg - 90) * Math.PI / 180;
     return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
@@ -758,21 +820,26 @@ App.pages = App.pages || {};
     return 'M' + cx + ' ' + cy + ' L' + p0.x.toFixed(2) + ' ' + p0.y.toFixed(2)
       + ' A' + r + ' ' + r + ' 0 ' + large + ' 1 ' + p1.x.toFixed(2) + ' ' + p1.y.toFixed(2) + ' Z';
   }
-  function buildWheelSVG(pool, hue) {
-    var N = pool.length, step = 360 / N;
-    var s = "<svg viewBox='0 0 200 200' width='200' height='200'>";
+  function buildWheelSVG(pool, hue, size) {
+    var SZ = size || 200;
+    var cx = SZ / 2, cy = SZ / 2, r = SZ / 2 - 5;
+    var N = pool.length, step = N > 0 ? 360 / N : 0;
+    var s = "<svg viewBox='0 0 " + SZ + ' ' + SZ + "' width='" + SZ + "' height='" + SZ + "'>";
     s += "<g class='wheelRot'>";
+    // 菜数越多字号越小、单名截短越短；30 道时约 6px、截 3 字
+    var fontSize = N > 20 ? 6 : (N > 14 ? 7 : (N > 8 ? 8 : 9));
+    var maxChars = N > 20 ? 3 : (N > 14 ? 3 : (N > 8 ? 4 : 5));
     for (var i = 0; i < N; i++) {
       var a0 = i * step, a1 = (i + 1) * step;
       var light = 32 + (i % 3) * 9;
-      s += "<path d='" + sectorPath(100, 100, 95, a0, a1) + "' fill='hsl(" + hue + ',55%,' + light + "%)' stroke='#fff' stroke-width='1'/>";
-      var mid = a0 + step / 2, pos = polar(100, 100, 62, mid), nm = pool[i].name;
-      if (nm.length > 4) nm = nm.slice(0, 4) + '…';
-      s += "<text x='" + pos.x.toFixed(1) + "' y='" + pos.y.toFixed(1) + "' transform='rotate(" + mid + ' ' + pos.x.toFixed(1) + ' ' + pos.y.toFixed(1) + ")' font-size='8' fill='#fff' text-anchor='middle' dominant-baseline='middle'>" + nm + '</text>';
+      s += "<path d='" + sectorPath(cx, cy, r, a0, a1) + "' fill='hsl(" + hue + ',55%,' + light + "%)' stroke='#fff' stroke-width='1'/>";
+      var mid = a0 + step / 2, pos = polar(cx, cy, r * 0.65, mid), nm = pool[i].name;
+      if (nm.length > maxChars) nm = nm.slice(0, maxChars) + '…';
+      s += "<text x='" + pos.x.toFixed(1) + "' y='" + pos.y.toFixed(1) + "' transform='rotate(" + mid + ' ' + pos.x.toFixed(1) + ' ' + pos.y.toFixed(1) + ")' font-size='" + fontSize + "' fill='#fff' text-anchor='middle' dominant-baseline='middle'>" + nm + '</text>';
     }
     s += "</g>";
-    s += "<circle cx='100' cy='100' r='14' fill='#fff' stroke='#e8ecf4' stroke-width='2'/>";
-    s += "<path d='M100 4 L93 20 L107 20 Z' fill='#ef4848'/>";
+    s += "<circle cx='" + cx + "' cy='" + cy + "' r='14' fill='#fff' stroke='#e8ecf4' stroke-width='2'/>";
+    s += "<path d='M" + cx + " 4 L" + (cx - 7) + " 20 L" + (cx + 7) + " 20 Z' fill='#ef4848'/>";
     s += "</svg>";
     return s;
   }
